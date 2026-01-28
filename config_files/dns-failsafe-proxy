@@ -8,4 +8,3 @@ config dns-failsafe-proxy 'main'
 	option failback_port '5453'
 	option connect_timeout '150'
 	option session_timeout '2000'
-
