@@ -83,4 +83,3 @@ config resolver
 config resolver
 	option address '2620:fe::9'
 	option tls_auth_name 'dns.quad9.net'
-
