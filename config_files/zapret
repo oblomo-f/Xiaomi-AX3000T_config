@@ -29,6 +29,7 @@ config main 'config'
 	option NFQWS_UDP_PKT_IN '0'
 	option NFQWS_PORTS_TCP_KEEPALIVE '0'
 	option NFQWS_PORTS_UDP_KEEPALIVE '0'
+    option DAEMON_LOG_SIZE_MAX '2000'
 	option NFQWS_OPT '
 --filter-tcp=443
 --hostlist=/opt/zapret/ipset/zapret-hosts-google.txt
