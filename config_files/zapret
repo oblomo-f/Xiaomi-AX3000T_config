@@ -34,8 +34,9 @@ config main 'config'
 --filter-tcp=443
 --hostlist=/opt/zapret/ipset/zapret-hosts-google.txt
 --hostlist=/opt/zapret/ipset/zapret-hosts-user.txt
---dpi-desync=multisplit
---dpi-desync-split-pos=1,sniext+1
---dpi-desync-split-seqovl=1
+--hostlist-exclude-domains=openwrt.org
+--dpi-desync=fakedsplit
+--dpi-desync-fooling=badseq
+--dpi-desync-split-pos=1
 '
 
