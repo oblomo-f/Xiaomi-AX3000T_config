@@ -20,7 +20,8 @@ Watchdog каждые 30 секунд проверяет доступ в инт�
 На роутере OpenWrt выполнить от `root`:
 
 ```sh
-wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T/main/install.sh | sh
+wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install.sh | sh
+
 ```
 
 GitHub автоматически отдаёт raw-содержимое файлов через raw.githubusercontent.com.
