@@ -216,16 +216,16 @@ uninstall_watchdog() {
 while true; do
     clear
     echo "=========================================="
-    echo "               Podkop Watchdog"
+    echo "     Xiaomi AX3000T — Podkop Watchdog"
     echo "=========================================="
     echo ""
 
     if service_running; then
-        echo "  Статус: ● RUNNING"
+        printf "  Статус: \033[32m● ЗАПУЩЕН\033[0m\\n"
     elif [ -x "$WATCHDOG" ]; then
-        echo "  Статус: ○ STOPPED"
+        printf "  Статус: \033[33m○ ОСТАНОВЛЕН\033[0m\\n"
     else
-        echo "  Статус: ○ НЕ УСТАНОВЛЕН"
+        printf "  Статус: \033[31m○ НЕ УСТАНОВЛЕН\033[0m\\n"
     fi
 
     echo ""
