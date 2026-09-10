@@ -7,7 +7,7 @@
 На роутере выполнить от `root`:
 
 ```sh
-wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install.sh | sh
+sh <(wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install.sh)
 ```
 
 Откроется меню:
