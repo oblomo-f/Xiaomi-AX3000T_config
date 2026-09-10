@@ -7,22 +7,23 @@
 На роутере выполнить от `root`:
 
 ```sh
-sh <(wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install.sh)
+wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install.sh | sh
 ```
 
 Откроется меню:
 
 ```text
 ==========================================
-           Podkop Watchdog
+     Podkop Watchdog
 ==========================================
 
   1) Установить / обновить
   2) Проверить статус
   3) Перезапустить watchdog
   4) Остановить watchdog
-  5) Показать лог
-  6) Удалить
+  5) Изменить домен проверки
+  6) Показать лог
+  7) Удалить
   0) Выход
 ```
 
