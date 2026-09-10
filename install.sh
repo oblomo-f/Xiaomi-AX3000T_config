@@ -4,6 +4,7 @@ REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
 WATCHDOG="/root/podkop-watchdog.sh"
 SERVICE="/etc/init.d/podkop-watchdog"
 LOG="/root/podkop-watchdog.log"
+ROTATE="/root/podkop-watchdog.rotate"
 
 pause() {
     echo ""
@@ -11,30 +12,44 @@ pause() {
     read dummy
 }
 
+service_running() {
+    ps | grep '[p]odkop-watchdog.sh' >/dev/null 2>&1
+}
+
+service_enabled() {
+    [ -L /etc/rc.d/S99podkop-watchdog ] || [ -e /etc/rc.d/S99podkop-watchdog ]
+}
+
 check_status() {
     echo ""
     echo "========== Podkop Watchdog =========="
-    if [ -x "$SERVICE" ]; then
-        echo "Сервис: установлен"
+    if [ -x "$SERVICE" ] && [ -x "$WATCHDOG" ]; then
+        echo "Установлен: ДА"
     else
-        echo "Сервис: НЕ установлен"
+        echo "Установлен: НЕТ"
     fi
 
-    if ps | grep '[p]odkop-watchdog.sh' >/dev/null 2>&1; then
+    if service_running; then
         echo "Статус: ЗАПУЩЕН"
         ps | grep '[p]odkop-watchdog.sh'
     else
         echo "Статус: ОСТАНОВЛЕН"
     fi
 
+    if service_enabled; then
+        echo "Автозапуск: ВКЛЮЧЁН"
+    else
+        echo "Автозапуск: ВЫКЛЮЧЕН"
+    fi
+
     echo ""
-    if [ -x "$WATCHDOG" ]; then
+    if [ -f "$WATCHDOG" ]; then
         echo "Настройки:"
         grep -E '^(DOMAIN|CHECK_INTERVAL|FAIL_LIMIT|RESTART_WAIT|ROTATE_SECONDS)=' "$WATCHDOG" 2>/dev/null
     fi
 
     echo ""
-    echo "Последние записи лога:"
+    echo "Лог:"
     if [ -s "$LOG" ]; then
         tail -20 "$LOG"
     else
@@ -48,7 +63,7 @@ check_status() {
 
 install_watchdog() {
     echo ""
-    echo "========== Установка =========="
+    echo "========== Установка / обновление =========="
 
     if [ "$(id -u)" != "0" ]; then
         echo "Ошибка: запустите скрипт от root."
@@ -60,36 +75,56 @@ install_watchdog() {
         return 1
     fi
 
-    echo "[1/4] Загружаю watchdog..."
-    wget -q -O "$WATCHDOG" "$REPO_RAW/podkop-watchdog.sh" || {
-        echo "Ошибка загрузки watchdog."
+    echo -n "[1/4] Загружаю watchdog... "
+    if wget -q -O "$WATCHDOG" "$REPO_RAW/podkop-watchdog.sh"; then
+        chmod +x "$WATCHDOG"
+        echo "OK"
+    else
+        echo "ОШИБКА"
+        rm -f "$WATCHDOG"
         return 1
-    }
+    fi
 
-    echo "[2/4] Загружаю init-скрипт..."
-    wget -q -O "$SERVICE" "$REPO_RAW/etc/init.d/podkop-watchdog" || {
-        echo "Ошибка загрузки init-скрипта."
+    echo -n "[2/4] Загружаю init-скрипт... "
+    if wget -q -O "$SERVICE" "$REPO_RAW/etc/init.d/podkop-watchdog"; then
+        chmod +x "$SERVICE"
+        echo "OK"
+    else
+        echo "ОШИБКА"
         return 1
-    }
+    fi
 
-    chmod +x "$WATCHDOG" "$SERVICE"
+    echo -n "[3/4] Создаю лог... "
+    touch "$LOG" "$ROTATE"
+    echo "OK"
 
-    echo "[3/4] Создаю лог..."
-    touch "$LOG" /root/podkop-watchdog.rotate
+    echo -n "[4/4] Запускаю watchdog... "
 
-    echo "[4/4] Включаю автозапуск..."
-    "$SERVICE" enable
-    "$SERVICE" restart
+    # Не используем вывод enable/restart, чтобы служебные сообщения
+    # OpenWrt не попадали в красивый интерфейс установщика.
+    "$SERVICE" stop >/dev/null 2>&1
+    "$SERVICE" enable >/dev/null 2>&1
+    "$SERVICE" start >/dev/null 2>&1
 
     sleep 2
 
-    echo ""
-    if ps | grep '[p]odkop-watchdog.sh' >/dev/null 2>&1; then
-        echo "✓ Watchdog успешно установлен и запущен."
+    if service_running; then
+        echo "OK"
     else
-        echo "⚠ Watchdog установлен, но процесс не найден."
-        echo "Проверьте: logread | grep podkop-watchdog"
+        echo "ОШИБКА"
+        echo ""
+        echo "Watchdog не запустился."
+        echo "Для диагностики:"
+        echo "  logread | grep podkop-watchdog"
+        return 1
     fi
+
+    echo ""
+    echo "✓ Watchdog успешно установлен / обновлён."
+    if service_enabled; then
+        echo "✓ Автозапуск включён."
+    fi
+    echo "✓ Процесс работает."
 }
 
 change_domain() {
@@ -104,6 +139,7 @@ change_domain() {
     CURRENT_DOMAIN="$(grep '^DOMAIN=' "$WATCHDOG" 2>/dev/null | sed 's/^DOMAIN="//; s/"$//')"
 
     echo "Текущий домен: $CURRENT_DOMAIN"
+    echo ""
     printf "Введите новый домен: "
     read NEW_DOMAIN
 
@@ -112,28 +148,50 @@ change_domain() {
         return 1
     fi
 
-    # Базовая проверка: без пробелов и слэшей.
     case "$NEW_DOMAIN" in
         *" "*|*"/"*|*"http://"*|*"https://"*)
-            echo "Ошибка: укажите только имя домена, например google.com"
+            echo "Ошибка: укажите только домен, например google.com"
             return 1
             ;;
     esac
+
+    if ! printf '%s\n' "$NEW_DOMAIN" | grep -Eq '^[A-Za-z0-9.-]+$'; then
+        echo "Ошибка: недопустимые символы в имени домена."
+        return 1
+    fi
 
     sed -i "s|^DOMAIN=.*|DOMAIN=\"$NEW_DOMAIN\"|" "$WATCHDOG"
 
     echo ""
     echo "✓ Домен изменён на: $NEW_DOMAIN"
-    echo "Перезапустить watchdog для применения? [Y/n]: "
+    echo ""
+    printf "Перезапустить watchdog для применения? [Y/n]: "
     read answer
 
     case "$answer" in
-        n|N) ;;
+        n|N)
+            echo "Изменение сохранено. Применится после перезапуска watchdog."
+            ;;
         *)
-            "$SERVICE" restart
-            echo "✓ Watchdog перезапущен."
+            "$SERVICE" restart >/dev/null 2>&1
+            sleep 1
+            if service_running; then
+                echo "✓ Watchdog перезапущен."
+            else
+                echo "⚠ Watchdog не запустился. Проверьте logread."
+            fi
             ;;
     esac
+}
+
+show_log() {
+    echo ""
+    echo "========== Лог Podkop Watchdog =========="
+    if [ -s "$LOG" ]; then
+        tail -50 "$LOG"
+    else
+        echo "Лог пуст — ошибок не зафиксировано."
+    fi
 }
 
 uninstall_watchdog() {
@@ -144,9 +202,9 @@ uninstall_watchdog() {
 
     case "$answer" in
         y|Y|д|Д)
-            "$SERVICE" stop 2>/dev/null
-            "$SERVICE" disable 2>/dev/null
-            rm -f "$SERVICE" "$WATCHDOG" "$LOG" /root/podkop-watchdog.rotate
+            "$SERVICE" stop >/dev/null 2>&1
+            "$SERVICE" disable >/dev/null 2>&1
+            rm -f "$SERVICE" "$WATCHDOG" "$LOG" "$ROTATE"
             echo "✓ Podkop Watchdog удалён."
             ;;
         *)
@@ -158,15 +216,26 @@ uninstall_watchdog() {
 while true; do
     clear
     echo "=========================================="
-    echo "     Podkop Watchdog"
+    echo "               Podkop Watchdog"
     echo "=========================================="
+    echo ""
+
+    if service_running; then
+        echo "  Статус: ● RUNNING"
+    elif [ -x "$WATCHDOG" ]; then
+        echo "  Статус: ○ STOPPED"
+    else
+        echo "  Статус: ○ НЕ УСТАНОВЛЕН"
+    fi
+
     echo ""
     echo "  1) Установить / обновить"
     echo "  2) Проверить статус"
     echo "  3) Перезапустить watchdog"
     echo "  4) Остановить watchdog"
-    echo "  5) Показать лог"
-    echo "  6) Удалить"
+    echo "  5) Изменить домен проверки"
+    echo "  6) Показать лог"
+    echo "  7) Удалить"
     echo "  0) Выход"
     echo ""
     printf "Выберите действие [0-7]: "
@@ -176,25 +245,22 @@ while true; do
         1) install_watchdog; pause ;;
         2) check_status; pause ;;
         3)
-            "$SERVICE" restart
-            echo "Watchdog перезапущен."
-            pause
-            ;;
-        4)
-            "$SERVICE" stop
-            echo "Watchdog остановлен."
-            pause
-            ;;
-        5) change_domain; pause ;;
-        6)
-            echo ""
-            if [ -s "$LOG" ]; then
-                tail -50 "$LOG"
+            "$SERVICE" restart >/dev/null 2>&1
+            sleep 1
+            if service_running; then
+                echo "✓ Watchdog перезапущен."
             else
-                echo "Лог пуст — ошибок не зафиксировано."
+                echo "⚠ Watchdog не запустился."
             fi
             pause
             ;;
+        4)
+            "$SERVICE" stop >/dev/null 2>&1
+            echo "✓ Watchdog остановлен."
+            pause
+            ;;
+        5) change_domain; pause ;;
+        6) show_log; pause ;;
         7) uninstall_watchdog; pause ;;
         0|q|Q) exit 0 ;;
         *) echo "Неверный выбор."; sleep 1 ;;
