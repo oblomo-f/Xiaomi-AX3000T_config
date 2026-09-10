@@ -1,6 +1,6 @@
 #!/bin/sh
 
-REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T/main"
+REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
 
 echo "========================================"
 echo " Xiaomi AX3000T - Podkop Watchdog"
