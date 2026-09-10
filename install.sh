@@ -114,7 +114,7 @@ uninstall_watchdog() {
 while true; do
     clear
     echo "=========================================="
-    echo "               "Podkop Watchdog"
+    echo "               Podkop Watchdog            "
     echo "=========================================="
     echo ""
     echo "  1) Установить / обновить"
