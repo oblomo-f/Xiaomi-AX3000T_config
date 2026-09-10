@@ -92,6 +92,50 @@ install_watchdog() {
     fi
 }
 
+change_domain() {
+    echo ""
+    echo "========== Домен проверки =========="
+
+    if [ ! -f "$WATCHDOG" ]; then
+        echo "Watchdog не установлен."
+        return 1
+    fi
+
+    CURRENT_DOMAIN="$(grep '^DOMAIN=' "$WATCHDOG" 2>/dev/null | sed 's/^DOMAIN="//; s/"$//')"
+
+    echo "Текущий домен: $CURRENT_DOMAIN"
+    printf "Введите новый домен: "
+    read NEW_DOMAIN
+
+    if [ -z "$NEW_DOMAIN" ]; then
+        echo "Домен не указан. Отмена."
+        return 1
+    fi
+
+    # Базовая проверка: без пробелов и слэшей.
+    case "$NEW_DOMAIN" in
+        *" "*|*"/"*|*"http://"*|*"https://"*)
+            echo "Ошибка: укажите только имя домена, например google.com"
+            return 1
+            ;;
+    esac
+
+    sed -i "s|^DOMAIN=.*|DOMAIN=\"$NEW_DOMAIN\"|" "$WATCHDOG"
+
+    echo ""
+    echo "✓ Домен изменён на: $NEW_DOMAIN"
+    echo "Перезапустить watchdog для применения? [Y/n]: "
+    read answer
+
+    case "$answer" in
+        n|N) ;;
+        *)
+            "$SERVICE" restart
+            echo "✓ Watchdog перезапущен."
+            ;;
+    esac
+}
+
 uninstall_watchdog() {
     echo ""
     echo "========== Удаление =========="
@@ -114,7 +158,7 @@ uninstall_watchdog() {
 while true; do
     clear
     echo "=========================================="
-    echo "               Podkop Watchdog            "
+    echo "     Podkop Watchdog"
     echo "=========================================="
     echo ""
     echo "  1) Установить / обновить"
@@ -125,7 +169,7 @@ while true; do
     echo "  6) Удалить"
     echo "  0) Выход"
     echo ""
-    printf "Выберите действие [0-6]: "
+    printf "Выберите действие [0-7]: "
     read choice
 
     case "$choice" in
@@ -141,7 +185,8 @@ while true; do
             echo "Watchdog остановлен."
             pause
             ;;
-        5)
+        5) change_domain; pause ;;
+        6)
             echo ""
             if [ -s "$LOG" ]; then
                 tail -50 "$LOG"
@@ -150,7 +195,7 @@ while true; do
             fi
             pause
             ;;
-        6) uninstall_watchdog; pause ;;
+        7) uninstall_watchdog; pause ;;
         0|q|Q) exit 0 ;;
         *) echo "Неверный выбор."; sleep 1 ;;
     esac
