@@ -14,7 +14,7 @@ sh <(wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/m
 
 ```text
 ==========================================
-     Xiaomi AX3000T — Podkop Watchdog
+           Podkop Watchdog
 ==========================================
 
   1) Установить / обновить
@@ -32,7 +32,7 @@ sh <(wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/m
 
 При нормальном интернете успешные проверки в лог не записываются.
 
-После 3 ошибок подряд выполняется:
+После 3 ошибок подряд выполняется перезапуск Podkop:
 
 ```sh
 /etc/init.d/podkop restart
