@@ -360,9 +360,10 @@ return view.extend({
                 return uci.save().then(function() {
                     return callAction('commit');
                 }).then(function() {
-                    return callAction('restart');
+                    var enabledNow = uci.get('podkop_watchdog','main','enabled') === '1';
+                    return callAction(enabledNow ? 'restart' : 'stop');
                 }).then(function() {
-                    ui.addNotification(null, E('p', {}, _('Настройки сохранены и watchdog перезапущен.')), 'info');
+                    ui.addNotification(null, E('p', {}, _('Настройки сохранены.')), 'info');
                     return callStatus();
                 }).catch(function(err) {
                     ui.addNotification(null, E('p', {}, _('Ошибка сохранения: ') + String(err)), 'error');

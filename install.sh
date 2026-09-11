@@ -166,6 +166,36 @@ uninstall_all() {
     echo "✓ Watchdog Shell и Web-интерфейс полностью удалены."
 }
 
+
+install_menu_command() {
+    if [ "$(id -u)" != "0" ]; then
+        echo "Ошибка: запустите скрипт от root."
+        return 1
+    fi
+
+    cat > /usr/bin/Podkop-w <<'EOF'
+#!/bin/sh
+REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
+TMP="/tmp/podkop-w-install.sh"
+
+if ! command -v wget >/dev/null 2>&1; then
+    echo "Ошибка: требуется wget."
+    exit 1
+fi
+
+if ! wget -q -O "$TMP" "$REPO_RAW/install.sh"; then
+    echo "Ошибка: не удалось загрузить меню Podkop Watchdog."
+    rm -f "$TMP"
+    exit 1
+fi
+
+chmod +x "$TMP"
+exec sh "$TMP"
+EOF
+    chmod +x /usr/bin/Podkop-w
+    echo "✓ Команда Podkop-w установлена."
+}
+
 install_watchdog() {
     echo ""
     echo "========== Установка / обновление =========="
@@ -230,6 +260,8 @@ install_watchdog() {
         echo "✓ Автозапуск включён."
     fi
     echo "✓ Процесс работает."
+    install_menu_command
+
 }
 
 change_domain() {
@@ -318,10 +350,12 @@ uninstall_watchdog() {
     esac
 }
 
+install_menu_command
+
 while true; do
     clear
     echo "=========================================="
-    echo "         Podkop Watchdog"
+    echo "     Xiaomi AX3000T — Podkop Watchdog"
     echo "=========================================="
     echo ""
 
@@ -333,6 +367,8 @@ while true; do
         printf "  Статус: \033[31m○ НЕ УСТАНОВЛЕН\033[0m\\n"
     fi
 
+    echo ""
+    echo "  Команда: Podkop-w — открыть это меню"
     echo ""
     echo "  1) Установить / обновить Watchdog"
     echo "  2) Проверить статус"

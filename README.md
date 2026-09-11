@@ -1,4 +1,4 @@
-# Podkop Watchdog
+# Xiaomi AX3000T — Podkop Watchdog
 
 Интерактивный watchdog для OpenWrt + Podkop.
 
