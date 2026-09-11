@@ -26,8 +26,10 @@ restart_wan() {
 	fi
 
 	log "Restarting WAN interface: $WAN_INTERFACE"
-	IFDOWN="$(command -v ifdown 2>/dev/null || echo /sbin/ifdown)"
-	IFUP="$(command -v ifup 2>/dev/null || echo /sbin/ifup)"
+	IFDOWN="$(command -v ifdown 2>/dev/null || true)"
+	[ -n "$IFDOWN" ] || [ -x /sbin/ifdown ] && IFDOWN="/sbin/ifdown"
+	IFUP="$(command -v ifup 2>/dev/null || true)"
+	[ -n "$IFUP" ] || [ -x /sbin/ifup ] && IFUP="/sbin/ifup"
 
 	if [ -x "$IFDOWN" ]; then
 		"$IFDOWN" "$WAN_INTERFACE" 2>>"$LOG" || log "ifdown failed for $WAN_INTERFACE"

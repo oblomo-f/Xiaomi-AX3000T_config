@@ -79,6 +79,24 @@ case "$1" in
 						uci commit podkop_watchdog
 						echo '{"ok":true}'
 						;;
+					reload_wan_podkop)
+						WAN_INTERFACE="$(uci -q get podkop_watchdog.main.wan_interface 2>/dev/null)"
+						[ -n "$WAN_INTERFACE" ] || WAN_INTERFACE="wan"
+						IFDOWN="$(command -v ifdown 2>/dev/null || true)"
+						IFUP="$(command -v ifup 2>/dev/null || true)"
+						[ -n "$IFDOWN" ] || [ -x /sbin/ifdown ] && IFDOWN="/sbin/ifdown"
+						[ -n "$IFUP" ] || [ -x /sbin/ifup ] && IFUP="/sbin/ifup"
+						if [ -n "$IFDOWN" ] && [ -x "$IFDOWN" ]; then
+							"$IFDOWN" "$WAN_INTERFACE" >/dev/null 2>&1 || true
+						fi
+						sleep 3
+						if [ -n "$IFUP" ] && [ -x "$IFUP" ]; then
+							"$IFUP" "$WAN_INTERFACE" >/dev/null 2>&1 || true
+						fi
+						sleep 5
+						/etc/init.d/podkop restart >/dev/null 2>&1 || true
+						echo '{"ok":true}'
+						;;
 					check)
 						DOMAIN="$(uci -q get podkop_watchdog.main.domain)"
 						[ -n "$DOMAIN" ] || DOMAIN="google.com"

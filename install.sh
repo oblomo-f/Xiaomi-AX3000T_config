@@ -1,6 +1,6 @@
 #!/bin/sh
 
-REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
+REPO_RAW="https://raw.githubusercontent.com/oblomo-f/_config/main"
 WATCHDOG="/root/podkop-watchdog.sh"
 SERVICE="/etc/init.d/podkop-watchdog"
 LOG="/root/podkop-watchdog.log"
@@ -175,9 +175,28 @@ install_menu_command() {
         return 1
     fi
 
+    # Keep a local copy of the menu. It remains usable when Internet is down.
+    TMP_MENU="/tmp/podkop-watchdog-menu.sh"
+    if wget -q -O "$TMP_MENU" "$REPO_RAW/install.sh"; then
+        chmod +x "$TMP_MENU"
+        mv "$TMP_MENU" /usr/bin/podkop-watchdog-menu.sh
+        chmod +x /usr/bin/podkop-watchdog-menu.sh
+    else
+        rm -f "$TMP_MENU"
+        echo "⚠ Не удалось обновить локальное меню; существующее меню сохранено."
+    fi
+
     cat > /usr/bin/Podkop-w <<'EOF'
 #!/bin/sh
-REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
+LOCAL_MENU="/usr/bin/podkop-watchdog-menu.sh"
+
+# First use the local menu: it works without Internet.
+if [ -x "$LOCAL_MENU" ]; then
+    exec "$LOCAL_MENU"
+fi
+
+# Fallback for old installations.
+REPO_RAW="https://raw.githubusercontent.com/oblomo-f/_config/main"
 TMP="/tmp/podkop-w-install.sh"
 
 if ! command -v wget >/dev/null 2>&1; then
@@ -186,7 +205,7 @@ if ! command -v wget >/dev/null 2>&1; then
 fi
 
 if ! wget -q -O "$TMP" "$REPO_RAW/install.sh"; then
-    echo "Ошибка: не удалось загрузить меню Podkop Watchdog."
+    echo "Ошибка: Интернет недоступен, локальное меню не найдено."
     rm -f "$TMP"
     exit 1
 fi
@@ -343,6 +362,43 @@ change_domain() {
     esac
 }
 
+
+reload_wan_podkop() {
+    echo ""
+    echo "========== Перегрузка WAN + Podkop =========="
+
+    WAN_INTERFACE="$(uci -q get podkop_watchdog.main.wan_interface 2>/dev/null)"
+    [ -n "$WAN_INTERFACE" ] || WAN_INTERFACE="wan"
+
+    IFDOWN="$(command -v ifdown 2>/dev/null)"
+    IFUP="$(command -v ifup 2>/dev/null)"
+    [ -n "$IFDOWN" ] || [ -x /sbin/ifdown ] && IFDOWN="/sbin/ifdown"
+    [ -n "$IFUP" ] || [ -x /sbin/ifup ] && IFUP="/sbin/ifup"
+
+    echo "WAN интерфейс: $WAN_INTERFACE"
+
+    if [ -n "$IFDOWN" ] && [ -x "$IFDOWN" ]; then
+        echo "[1/3] Отключаю WAN..."
+        "$IFDOWN" "$WAN_INTERFACE" 2>&1 || true
+        sleep 3
+    else
+        echo "[1/3] ifdown не найден — пропускаю."
+    fi
+
+    if [ -n "$IFUP" ] && [ -x "$IFUP" ]; then
+        echo "[2/3] Включаю WAN..."
+        "$IFUP" "$WAN_INTERFACE" 2>&1 || true
+        sleep 5
+    else
+        echo "[2/3] ifup не найден — пропускаю."
+    fi
+
+    echo "[3/3] Перезапускаю Podkop..."
+    /etc/init.d/podkop restart
+    echo ""
+    echo "✓ WAN + Podkop перегружены."
+}
+
 show_log() {
     echo ""
     echo "========== Лог Podkop Watchdog =========="
@@ -377,7 +433,7 @@ install_menu_command
 while true; do
     clear
     echo "=========================================="
-    echo "           Podkop Watchdog"
+    echo "              Podkop Watchdog"
     echo "=========================================="
     echo ""
 
@@ -403,6 +459,7 @@ while true; do
     echo "  7) Установить / обновить Web"
     echo "  8) Удалить Web"
     echo "  9) Удалить полностью (Web + Shell)"
+    echo "  10) Перегрузить WAN + Podkop"
     echo
     echo "  0) Выход"
     echo ""
@@ -442,6 +499,10 @@ while true; do
         7) install_web; pause ;;
         8) uninstall_web; pause ;;
         9) uninstall_all; pause ;;
+        10)
+            reload_wan_podkop
+            pause
+            ;;
         0|q|Q) exit 0 ;;
         *) echo "Неверный выбор."; sleep 1 ;;
     esac

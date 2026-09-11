@@ -149,6 +149,18 @@ return view.extend({
             restartButton,
             E('button', {
                 'type':'button',
+                'class':'cbi-button cbi-button-action',
+                'click':ui.createHandlerFn(this,function() {
+                    return callAction('reload_wan_podkop').then(function(reply) {
+                        if (reply && reply.ok === false)
+                            throw new Error(reply.error || _('Не удалось перегрузить WAN + Podkop'));
+                        ui.addNotification(null,E('p',{},_('WAN + Podkop перегружены.')),'info');
+                        return refreshStatus();
+                    });
+                })
+            }, _('Перегрузить WAN + Podkop')),
+            E('button', {
+                'type':'button',
                 'class':'cbi-button',
                 'click':ui.createHandlerFn(this,function() {
                     return callAction('check').then(function(reply) {
@@ -314,7 +326,7 @@ return view.extend({
 
         var wanBlock = E('div', {'style':'margin:0 0 18px 0;'}, [
             E('label', {'style':'display:block;font-weight:bold;margin-bottom:3px;'}, _('WAN интерфейс')),
-            E('div', {'style':'font-size:12px;opacity:.75;margin-bottom:5px;'}, _('Логический интерфейс OpenWrt, который будет переподнят. Обычно: wan.')),
+            E('div', {'style':'font-size:12px;opacity:.75;margin-bottom:5px;'}, _('Обязательный логический интерфейс OpenWrt, который будет переподнят. По умолчанию: wan.')),
             wanSelect
         ]);
         settings.appendChild(wanBlock);

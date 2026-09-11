@@ -1,11 +1,11 @@
-# Xiaomi AX3000T — Podkop Watchdog
+#  — Podkop Watchdog
 
 Интерактивный watchdog для OpenWrt + Podkop.
 
 ## Запуск меню
 
 ```sh
-sh <(wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install.sh)
+sh <(wget -O- https://raw.githubusercontent.com/oblomo-f/_config/main/install.sh)
 ```
 
 ## Меню
@@ -71,7 +71,7 @@ Watchdog устанавливается как OpenWrt `procd` service и зап
 
 ## Репозиторий
 
-https://github.com/oblomo-f/Xiaomi-AX3000T_config
+https://github.com/oblomo-f/_config
 
 ---
 ## v49
@@ -81,3 +81,16 @@ https://github.com/oblomo-f/Xiaomi-AX3000T_config
 - После запуска/остановки/перезапуска статус в Web-интерфейсе обновляется сразу.
 - Исправлена логика `procd`: ручная остановка больше не приводит к немедленному повторному запуску из-за `respawn`.
 - Init-скрипт LuCI теперь проверяет `podkop_watchdog.main.enabled` перед запуском.
+
+
+## Аварийное восстановление
+
+`Podkop-w` использует локально сохранённое меню, поэтому оно доступно даже без Интернета.
+
+Добавлен пункт:
+
+```text
+10) Перегрузить WAN + Podkop
+```
+
+Он использует обязательный WAN-интерфейс из настройки `wan_interface` (по умолчанию `wan`), выполняет `ifdown`, `ifup`, затем перезапускает Podkop.
