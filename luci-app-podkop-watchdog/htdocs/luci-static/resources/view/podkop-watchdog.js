@@ -70,11 +70,7 @@ return view.extend({
             E('div', {
                 'style':'display:flex;align-items:center;gap:10px;margin-bottom:12px;'
             }, [
-                E('span', {
-                    'id':'podkop-watchdog-status-label',
-                    'style':'font-weight:700;'
-                }, 'Статус:'),
-                E('span', {
+E('span', {
                     'id':'podkop-watchdog-status',
                     'style':'font-weight:700;'
                 }, [
@@ -82,7 +78,7 @@ return view.extend({
                     E('span', {
                         'id':'watchdog-status-state',
                         'style': status.running === true ? 'color:#2e7d32;' : 'color:#c62828;'
-                    }, status.running === true ? '● Запущен' : '● Остановлен')
+                    }, status.running === true ? 'Запущен' : 'Остановлен')
                 ]),
                 E('span', {
                     'id':'podkop-installed-status',
@@ -127,7 +123,7 @@ var statusEl = document.getElementById('podkop-watchdog-status');
             if (statusEl) {
                 var watchdogStateEl = document.getElementById('watchdog-status-state');
                 if (watchdogStateEl) {
-                    watchdogStateEl.textContent = st.running === true ? '● Запущен' : '● Остановлен';
+                    watchdogStateEl.textContent = st.running === true ? 'Запущен' : 'Остановлен';
                     watchdogStateEl.style = st.running === true ? 'color:#2e7d32;' : 'color:#c62828;';
                 }
             }
