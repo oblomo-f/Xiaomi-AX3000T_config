@@ -472,6 +472,8 @@ while true; do
     echo "  7) Установить / обновить Web"
     echo "  8) Удалить Web"
     echo "  9) Удалить полностью (Web + Shell)"
+    echo
+    echo "  --- Интерфейс ---"
     echo "  10) Перегрузить WAN + Podkop"
     echo
     echo "  0) Выход"
