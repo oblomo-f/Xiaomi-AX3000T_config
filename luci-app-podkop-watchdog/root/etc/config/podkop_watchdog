@@ -1,0 +1,8 @@
+config watchdog 'main'
+	option enabled '1'
+	option domain 'google.com'
+	option check_interval '30'
+	option fail_limit '3'
+	option restart_wait '20'
+	option rotate_seconds '259200'
+	option log '/root/podkop-watchdog.log'
