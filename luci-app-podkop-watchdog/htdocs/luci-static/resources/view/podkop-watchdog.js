@@ -83,7 +83,17 @@ return view.extend({
                 E('span', {
                     'id':'podkop-installed-status',
                     'style':'font-weight:700;margin-left:18px;'
-                }, status.podkop_installed !== true ? 'Podkop: Не установлен' : (status.podkop_running === true ? 'Podkop: Установлен и работает.' : 'Podkop: Установлен, но не работает.'))
+                }, [
+                    E('span', {}, 'Podkop: '),
+                    E('span', {
+                        'id':'podkop-status-state',
+                        'style': status.podkop_installed !== true
+                            ? 'color:#c62828;'
+                            : (status.podkop_running === true ? 'color:#2e7d32;' : 'color:#f9a825;')
+                    }, status.podkop_installed !== true
+                        ? 'Не установлен'
+                        : (status.podkop_running === true ? 'Установлен и работает.' : 'Установлен, но не работает.'))
+                ])
             ])
         ]);
 
@@ -96,12 +106,18 @@ var statusEl = document.getElementById('podkop-watchdog-status');
             var podkopEl = document.getElementById('podkop-installed-status');
 
             if (podkopEl) {
-                podkopEl.textContent = st.podkop_installed !== true ? 'Podkop: Не установлен' : (st.podkop_running === true ? 'Podkop: Установлен и работает.' : 'Podkop: Установлен, но не работает.');
-                podkopEl.style = st.podkop_installed !== true
-                    ? 'font-weight:700;color:#c62828;'
-                    : (st.podkop_running === true
-                        ? 'font-weight:700;color:#2e7d32;'
-                        : 'font-weight:700;color:#f9a825;');
+                var podkopStateEl = document.getElementById('podkop-status-state');
+                var podkopState = st.podkop_installed !== true
+                    ? 'Не установлен'
+                    : (st.podkop_running === true ? 'Установлен и работает.' : 'Установлен, но не работает.');
+                var podkopStateColor = st.podkop_installed !== true
+                    ? '#c62828'
+                    : (st.podkop_running === true ? '#2e7d32' : '#f9a825');
+
+                if (podkopStateEl) {
+                    podkopStateEl.textContent = podkopState;
+                    podkopStateEl.style = 'color:' + podkopStateColor + ';';
+                }
             }
 
             if (statusEl) {
