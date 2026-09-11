@@ -23,6 +23,13 @@ var callLog = rpc.declare({
     expect: {}
 });
 
+var callClearLog = rpc.declare({
+    object: 'podkop-watchdog',
+    method: 'action',
+    params: [ 'action' ],
+    expect: {}
+});
+
 var callNetworkDump = rpc.declare({
     object: 'network.interface',
     method: 'dump',
@@ -469,13 +476,29 @@ return view.extend({
             })
         }, _('Обновить лог'));
 
+        var clearLogButton = E('button', {
+            'class':'cbi-button podkop-log-refresh',
+            'click':ui.createHandlerFn(this,function() {
+                return callClearLog('clear_log').then(function(reply) {
+                    if (reply && reply.ok === false)
+                        throw new Error(reply.error || _('Не удалось очистить лог'));
+                    logBox.textContent = _('Лог пуст.');
+                    ui.addNotification(null, E('p', {}, _('Лог очищен.')), 'info');
+                }).catch(function(err) {
+                    ui.addNotification(null, E('p', {}, _('Ошибка очистки лога: ') + String(err)), 'error');
+                });
+            }),
+            'id':'podkop-log-clear'
+        }, _('Очистить лог'));
+
         var logRow = E('div', {
             'class':'podkop-log-row', 'style':'display:flex;align-items:flex-start;margin-top:8px;width:55%;'
         }, [
             E('div', {
                 'style':'flex:1 1 auto; min-width:0;'
             }, [logBox]),
-            refreshLogButton
+            refreshLogButton,
+            clearLogButton
         ]);
 
         var logSection = E('div', {'class':'cbi-section'}, [

@@ -97,6 +97,12 @@ case "$1" in
 						/etc/init.d/podkop restart >/dev/null 2>&1 || true
 						echo '{"ok":true}'
 						;;
+					clear_log)
+						LOG="$(uci -q get podkop_watchdog.main.log 2>/dev/null)"
+						[ -n "$LOG" ] || LOG="/root/podkop-watchdog.log"
+						: > "$LOG"
+						echo '{"ok":true}'
+						;;
 					check)
 						DOMAIN="$(uci -q get podkop_watchdog.main.domain)"
 						[ -n "$DOMAIN" ] || DOMAIN="google.com"
