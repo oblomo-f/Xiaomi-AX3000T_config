@@ -2,7 +2,7 @@
 
 set -e
 
-REPO_RAW="https://raw.githubusercontent.com/oblomo-f/_config/main"
+REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
 VIEW_DIR="/www/luci-static/resources/view"
 VIEW_FILE="$VIEW_DIR/podkop-watchdog.js"
 

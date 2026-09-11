@@ -1,10 +1,11 @@
 #!/bin/sh
 
-REPO_RAW="https://raw.githubusercontent.com/oblomo-f/_config/main"
+REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
 WATCHDOG="/root/podkop-watchdog.sh"
 SERVICE="/etc/init.d/podkop-watchdog"
 LOG="/root/podkop-watchdog.log"
 ROTATE="/root/podkop-watchdog.rotate"
+CACHE_DIR="/usr/share/podkop-watchdog-cache"
 
 pause() {
     echo ""
@@ -71,20 +72,23 @@ install_web() {
         return 1
     fi
 
-    if ! command -v wget >/dev/null 2>&1; then
-        echo "Ошибка: требуется wget."
-        return 1
-    fi
-
+    mkdir -p "$CACHE_DIR"
     TMP_WEB="/tmp/install-luci.sh"
+
     echo -n "Загружаю установщик Web... "
-    if wget -q -O "$TMP_WEB" "$REPO_RAW/install-luci.sh"; then
+    if command -v wget >/dev/null 2>&1 && wget -q -T 10 -O "$TMP_WEB" "$REPO_RAW/install-luci.sh"; then
         chmod +x "$TMP_WEB"
+        cp "$TMP_WEB" "$CACHE_DIR/install-luci.sh"
         echo "OK"
         sh "$TMP_WEB"
         rm -f "$TMP_WEB"
+    elif [ -s "$CACHE_DIR/install-luci.sh" ]; then
+        echo "ОФЛАЙН-КЭШ"
+        chmod +x "$CACHE_DIR/install-luci.sh"
+        sh "$CACHE_DIR/install-luci.sh"
     else
         echo "ОШИБКА"
+        echo "Нет Интернета и нет локальной копии Web."
         rm -f "$TMP_WEB"
         return 1
     fi
@@ -176,40 +180,39 @@ install_menu_command() {
     fi
 
     # Keep a local copy of the menu. It remains usable when Internet is down.
+    mkdir -p "$CACHE_DIR"
     TMP_MENU="/tmp/podkop-watchdog-menu.sh"
-    if wget -q -O "$TMP_MENU" "$REPO_RAW/install.sh"; then
+    if command -v wget >/dev/null 2>&1 && wget -q -T 10 -O "$TMP_MENU" "$REPO_RAW/install.sh"; then
         chmod +x "$TMP_MENU"
+        cp "$TMP_MENU" "$CACHE_DIR/install.sh"
         mv "$TMP_MENU" /usr/bin/podkop-watchdog-menu.sh
         chmod +x /usr/bin/podkop-watchdog-menu.sh
-    else
-        rm -f "$TMP_MENU"
-        echo "⚠ Не удалось обновить локальное меню; существующее меню сохранено."
+    elif [ ! -x /usr/bin/podkop-watchdog-menu.sh ]; then
+        cp "$0" /usr/bin/podkop-watchdog-menu.sh 2>/dev/null || true
+        chmod +x /usr/bin/podkop-watchdog-menu.sh 2>/dev/null || true
     fi
 
     cat > /usr/bin/Podkop-w <<'EOF'
 #!/bin/sh
 LOCAL_MENU="/usr/bin/podkop-watchdog-menu.sh"
 
-# First use the local menu: it works without Internet.
+# First use the local menu. Internet is NOT required.
 if [ -x "$LOCAL_MENU" ]; then
     exec "$LOCAL_MENU"
 fi
 
-# Fallback for old installations.
-REPO_RAW="https://raw.githubusercontent.com/oblomo-f/_config/main"
+# Fallback for very old installations.
+REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
 TMP="/tmp/podkop-w-install.sh"
-
 if ! command -v wget >/dev/null 2>&1; then
     echo "Ошибка: требуется wget."
     exit 1
 fi
-
-if ! wget -q -O "$TMP" "$REPO_RAW/install.sh"; then
+if ! wget -q -T 10 -O "$TMP" "$REPO_RAW/install.sh"; then
     echo "Ошибка: Интернет недоступен, локальное меню не найдено."
     rm -f "$TMP"
     exit 1
 fi
-
 chmod +x "$TMP"
 exec sh "$TMP"
 EOF
@@ -226,27 +229,43 @@ install_watchdog() {
         return 1
     fi
 
-    if ! command -v wget >/dev/null 2>&1; then
-        echo "Ошибка: требуется wget."
-        return 1
-    fi
+    mkdir -p "$CACHE_DIR"
 
     echo -n "[1/4] Загружаю watchdog... "
-    if wget -q -O "$WATCHDOG" "$REPO_RAW/podkop-watchdog.sh"; then
-        chmod +x "$WATCHDOG"
+    TMP_WD="/tmp/podkop-watchdog.sh"
+    if command -v wget >/dev/null 2>&1 && wget -q -T 10 -O "$TMP_WD" "$REPO_RAW/podkop-watchdog.sh"; then
+        chmod +x "$TMP_WD"
+        cp "$TMP_WD" "$CACHE_DIR/podkop-watchdog.sh"
+        mv "$TMP_WD" "$WATCHDOG"
         echo "OK"
+    elif [ -s "$CACHE_DIR/podkop-watchdog.sh" ]; then
+        cp "$CACHE_DIR/podkop-watchdog.sh" "$WATCHDOG"
+        chmod +x "$WATCHDOG"
+        echo "ОФЛАЙН-КЭШ"
+    elif [ -x "$WATCHDOG" ]; then
+        echo "УЖЕ УСТАНОВЛЕН"
     else
         echo "ОШИБКА"
-        rm -f "$WATCHDOG"
+        echo "Нет Интернета и нет локальной копии watchdog."
         return 1
     fi
 
     echo -n "[2/4] Загружаю init-скрипт... "
-    if wget -q -O "$SERVICE" "$REPO_RAW/etc/init.d/podkop-watchdog"; then
-        chmod +x "$SERVICE"
+    TMP_INIT="/tmp/podkop-watchdog.init"
+    if command -v wget >/dev/null 2>&1 && wget -q -T 10 -O "$TMP_INIT" "$REPO_RAW/etc/init.d/podkop-watchdog"; then
+        chmod +x "$TMP_INIT"
+        cp "$TMP_INIT" "$CACHE_DIR/podkop-watchdog.init"
+        mv "$TMP_INIT" "$SERVICE"
         echo "OK"
+    elif [ -s "$CACHE_DIR/podkop-watchdog.init" ]; then
+        cp "$CACHE_DIR/podkop-watchdog.init" "$SERVICE"
+        chmod +x "$SERVICE"
+        echo "ОФЛАЙН-КЭШ"
+    elif [ -x "$SERVICE" ]; then
+        echo "УЖЕ УСТАНОВЛЕН"
     else
         echo "ОШИБКА"
+        echo "Нет Интернета и нет локальной копии init-скрипта."
         return 1
     fi
 
@@ -267,19 +286,16 @@ config podkop_watchdog 'main'
 EOF
     else
         uci -q set podkop_watchdog.main.enabled='1'
+        uci -q set podkop_watchdog.main.wan_interface="$(uci -q get podkop_watchdog.main.wan_interface || echo wan)"
         uci -q commit podkop_watchdog
     fi
     touch "$LOG" "$ROTATE"
     echo "OK"
 
     echo -n "[4/4] Запускаю watchdog... "
-
-    # Полностью останавливаем старый экземпляр, затем включаем автозапуск
-    # и запускаем службу.
     "$SERVICE" stop >/dev/null 2>&1 || true
     "$SERVICE" enable >/dev/null 2>&1 || true
     "$SERVICE" restart >/dev/null 2>&1 || true
-
     sleep 3
 
     if service_running; then
@@ -295,12 +311,9 @@ EOF
 
     echo ""
     echo "✓ Watchdog успешно установлен / обновлён."
-    if service_enabled; then
-        echo "✓ Автозапуск включён."
-    fi
+    echo "✓ Автозапуск включён."
     echo "✓ Процесс работает."
     install_menu_command
-
 }
 
 change_domain() {
@@ -463,7 +476,7 @@ while true; do
     echo
     echo "  0) Выход"
     echo ""
-    printf "Выберите действие [0-9]: "
+    printf "Выберите действие [0-10]: "
     read choice
 
     case "$choice" in
