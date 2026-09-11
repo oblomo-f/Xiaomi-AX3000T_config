@@ -95,7 +95,7 @@ LuCI → Services → Podkop Watchdog:
 После размещения каталога `luci-app-podkop-watchdog` в ветке `main` репозитория:
 
 ```sh
-sh <(wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install-luci.sh)
+sh <(wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install-luci.sh) install
 ```
 
 Или:
