@@ -70,17 +70,20 @@ return view.extend({
             E('div', {
                 'style':'display:flex;align-items:center;gap:10px;margin-bottom:12px;'
             }, [
-                E('h3', {'style':'margin:0;'}, _('Статус')),
                 E('span', {
-                    'id':'podkop-installed-status',
+                    'id':'podkop-watchdog-status-label',
                     'style':'font-weight:700;'
-                }, status.podkop_installed === true ? 'Podkop: УСТАНОВЛЕН' : 'Podkop: НЕ УСТАНОВЛЕН'),
+                }, 'Статус:'),
                 E('span', {
                     'id':'podkop-watchdog-status',
                     'style': (status.running === true && status.enabled !== false)
                         ? 'font-weight:700;color:#2e7d32;'
                         : 'font-weight:700;color:#c62828;'
-                }, (status.running === true && status.enabled !== false) ? '● ЗАПУЩЕН' : '● ОСТАНОВЛЕН')
+                }, (status.running === true && status.enabled !== false) ? '● Запущен' : '● Остановлен'),
+                E('span', {
+                    'id':'podkop-installed-status',
+                    'style':'font-weight:700;margin-left:18px;'
+                }, status.podkop_installed !== true ? 'Podkop: Не установлен' : (status.podkop_running === true ? 'Podkop: Установлен и работает.' : 'Podkop: Установлен, но не работает.'))
             ])
         ]);
 
@@ -93,12 +96,12 @@ return view.extend({
             var podkopEl = document.getElementById('podkop-installed-status');
 
             if (podkopEl) {
-                podkopEl.textContent = st.podkop_installed === true ? 'Podkop: УСТАНОВЛЕН' : 'Podkop: НЕ УСТАНОВЛЕН';
-                podkopEl.style = st.podkop_installed === true ? 'font-weight:700;color:#2e7d32;' : 'font-weight:700;color:#c62828;';
+                podkopEl.textContent = st.podkop_installed !== true ? 'Podkop: Не установлен' : (st.podkop_running === true ? 'Podkop: Установлен и работает.' : 'Podkop: Установлен, но не работает.');
+                podkopEl.style = st.podkop_installed !== true ? 'font-weight:700;color:#c62828;' : (st.podkop_running === true ? 'font-weight:700;color:#2e7d32;' : 'font-weight:700;color:#c62828;');
             }
 
             if (statusEl) {
-                statusEl.textContent = running ? '● ЗАПУЩЕН' : '● ОСТАНОВЛЕН';
+                statusEl.textContent = running ? '● Запущен' : '● Остановлен';
                 statusEl.style = running
                     ? 'font-weight:700;color:#2e7d32;'
                     : 'font-weight:700;color:#c62828;';

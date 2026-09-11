@@ -29,9 +29,14 @@ status_json() {
 	if [ "$RUNNING" = "1" ]; then RUNNING_JSON=true; else RUNNING_JSON=false; fi
 	if [ "$ENABLED" = "1" ]; then ENABLED_JSON=true; else ENABLED_JSON=false; fi
 	PODKOP_INSTALLED=0
+	PODKOP_RUNNING=0
 	[ -x /etc/init.d/podkop ] && PODKOP_INSTALLED=1
+	if [ "$PODKOP_INSTALLED" = "1" ]; then
+		pgrep -f '/usr/bin/sing-box run -c /etc/sing-box/config.json' >/dev/null 2>&1 && PODKOP_RUNNING=1
+	fi
 	if [ "$PODKOP_INSTALLED" = "1" ]; then PODKOP_JSON=true; else PODKOP_JSON=false; fi
-	printf '{"running":%s,"enabled":%s,"podkop_installed":%s}\n' "$RUNNING_JSON" "$ENABLED_JSON" "$PODKOP_JSON"
+	if [ "$PODKOP_RUNNING" = "1" ]; then PODKOP_RUNNING_JSON=true; else PODKOP_RUNNING_JSON=false; fi
+	printf '{"running":%s,"enabled":%s,"podkop_installed":%s,"podkop_running":%s}\n' "$RUNNING_JSON" "$ENABLED_JSON" "$PODKOP_JSON" "$PODKOP_RUNNING_JSON"
 }
 
 get_action() {
