@@ -1,14 +1,27 @@
 #!/bin/sh
 
 CONFIG="podkop_watchdog"
-DOMAIN="$(uci -q get ${CONFIG}.main.domain 2>/dev/null || echo google.com)"
-CHECK_INTERVAL="$(uci -q get ${CONFIG}.main.check_interval || echo 30)"
-FAIL_LIMIT="$(uci -q get ${CONFIG}.main.fail_limit || echo 3)"
-RESTART_WAIT="$(uci -q get ${CONFIG}.main.restart_wait || echo 20)"
-ROTATE_SECONDS="$(uci -q get ${CONFIG}.main.rotate_seconds || echo 259200)"
-LOG="$(uci -q get ${CONFIG}.main.log || echo /root/podkop-watchdog.log)"
-WAN_INTERFACE="$(uci -q get ${CONFIG}.main.wan_interface || echo wan)"
-RESTART_WAN="$(uci -q get ${CONFIG}.main.restart_wan || echo 0)"
+
+load_config() {
+	DOMAIN="$(uci -q get ${CONFIG}.main.domain 2>/dev/null)"
+	[ -n "$DOMAIN" ] || DOMAIN="google.com"
+	CHECK_INTERVAL="$(uci -q get ${CONFIG}.main.check_interval 2>/dev/null)"
+	[ -n "$CHECK_INTERVAL" ] || CHECK_INTERVAL="30"
+	FAIL_LIMIT="$(uci -q get ${CONFIG}.main.fail_limit 2>/dev/null)"
+	[ -n "$FAIL_LIMIT" ] || FAIL_LIMIT="3"
+	RESTART_WAIT="$(uci -q get ${CONFIG}.main.restart_wait 2>/dev/null)"
+	[ -n "$RESTART_WAIT" ] || RESTART_WAIT="20"
+	ROTATE_SECONDS="$(uci -q get ${CONFIG}.main.rotate_seconds 2>/dev/null)"
+	[ -n "$ROTATE_SECONDS" ] || ROTATE_SECONDS="259200"
+	LOG="$(uci -q get ${CONFIG}.main.log 2>/dev/null)"
+	[ -n "$LOG" ] || LOG="/root/podkop-watchdog.log"
+	WAN_INTERFACE="$(uci -q get ${CONFIG}.main.wan_interface 2>/dev/null)"
+	[ -n "$WAN_INTERFACE" ] || WAN_INTERFACE="wan"
+	RESTART_WAN="$(uci -q get ${CONFIG}.main.restart_wan 2>/dev/null)"
+	[ -n "$RESTART_WAN" ] || RESTART_WAN="0"
+}
+
+load_config
 
 FAIL=0
 START_TIME="$(date +%s)"
@@ -47,7 +60,12 @@ restart_wan() {
 }
 
 while true; do
-	now="$(date +%s)"
+	# Reload settings on every cycle so changes made in Web are picked up
+	# without relying on an old process environment.
+	load_config
+	CHECK_START="$(date +%s)"
+
+	now="$CHECK_START"
 
 	if [ $((now - START_TIME)) -ge "$ROTATE_SECONDS" ]; then
 		: > "$LOG"
@@ -73,5 +91,12 @@ while true; do
 		fi
 	fi
 
-	sleep "$CHECK_INTERVAL"
+	# CHECK_INTERVAL is the interval between the START of checks, not
+	# CHECK_INTERVAL plus the wget timeout. This keeps a configured 20 s
+	# interval close to 20 s even when wget takes several seconds to fail.
+	CHECK_END="$(date +%s)"
+	ELAPSED=$((CHECK_END - CHECK_START))
+	SLEEP_FOR=$((CHECK_INTERVAL - ELAPSED))
+	[ "$SLEEP_FOR" -gt 0 ] || SLEEP_FOR=0
+	sleep "$SLEEP_FOR"
 done
