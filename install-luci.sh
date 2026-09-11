@@ -1,5 +1,20 @@
 #!/bin/sh
 
+podkop_installed() {
+    [ -x /etc/init.d/podkop ] && return 0
+    [ -f /etc/init.d/podkop ] && return 0
+    return 1
+}
+
+check_podkop() {
+    if podkop_installed; then return 0; fi
+    echo ""
+    echo "Ошибка: Podkop не установлен."
+    echo "Сначала установите Podkop, затем установите Podkop Watchdog."
+    echo ""
+    return 1
+}
+
 set -e
 
 REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
@@ -12,6 +27,8 @@ if [ "$1" = "remove" ] || [ "$1" = "uninstall" ]; then
     sh <(wget -O- "$REPO_RAW/uninstall-luci.sh")
     exit $?
 fi
+
+if ! check_podkop; then exit 1; fi
 
 echo "[1/7] Installing watchdog backend..."
 mkdir -p /usr/libexec/rpcd

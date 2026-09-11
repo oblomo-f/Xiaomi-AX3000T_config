@@ -21,6 +21,30 @@ service_enabled() {
     [ -L /etc/rc.d/S99podkop-watchdog ] || [ -e /etc/rc.d/S99podkop-watchdog ]
 }
 
+podkop_installed() {
+    # Podkop is required because the watchdog restarts its service.
+    [ -x /etc/init.d/podkop ] && return 0
+    [ -f /etc/init.d/podkop ] && return 0
+    return 1
+}
+
+check_podkop() {
+    if podkop_installed; then
+        return 0
+    fi
+
+    echo ""
+    echo "=========================================="
+    echo "             Установка отменена"
+    echo "=========================================="
+    echo ""
+    echo "Ошибка: Podkop не установлен."
+    echo ""
+    echo "Сначала установите Podkop, затем установите Podkop Watchdog."
+    echo ""
+    return 1
+}
+
 check_status() {
     echo ""
     echo "========== Podkop Watchdog =========="
@@ -66,6 +90,10 @@ check_status() {
 install_web() {
     echo ""
     echo "========== Установка / обновление Web =========="
+
+    if ! check_podkop; then
+        return 1
+    fi
 
     if [ "$(id -u)" != "0" ]; then
         echo "Ошибка: запустите скрипт от root."
@@ -223,6 +251,10 @@ EOF
 install_watchdog() {
     echo ""
     echo "========== Установка / обновление =========="
+
+    if ! check_podkop; then
+        return 1
+    fi
 
     if [ "$(id -u)" != "0" ]; then
         echo "Ошибка: запустите скрипт от root."

@@ -72,6 +72,10 @@ return view.extend({
             }, [
                 E('h3', {'style':'margin:0;'}, _('Статус')),
                 E('span', {
+                    'id':'podkop-installed-status',
+                    'style':'font-weight:700;'
+                }, status.podkop_installed === true ? 'Podkop: УСТАНОВЛЕН' : 'Podkop: НЕ УСТАНОВЛЕН'),
+                E('span', {
                     'id':'podkop-watchdog-status',
                     'style': (status.running === true && status.enabled !== false)
                         ? 'font-weight:700;color:#2e7d32;'
@@ -86,6 +90,12 @@ return view.extend({
             st = st || {};
             var running = st.running === true && st.enabled !== false;
             var statusEl = document.getElementById('podkop-watchdog-status');
+            var podkopEl = document.getElementById('podkop-installed-status');
+
+            if (podkopEl) {
+                podkopEl.textContent = st.podkop_installed === true ? 'Podkop: УСТАНОВЛЕН' : 'Podkop: НЕ УСТАНОВЛЕН';
+                podkopEl.style = st.podkop_installed === true ? 'font-weight:700;color:#2e7d32;' : 'font-weight:700;color:#c62828;';
+            }
 
             if (statusEl) {
                 statusEl.textContent = running ? '● ЗАПУЩЕН' : '● ОСТАНОВЛЕН';
