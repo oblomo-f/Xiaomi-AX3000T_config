@@ -55,7 +55,7 @@ return view.extend({
             '.podkop-watchdog-page .cbi-value-field{display:block!important;float:none!important;width:auto!important;}',
             '.podkop-watchdog-page .cbi-value-description{display:block!important;margin:3px 0 8px 0!important;opacity:.8;}',
             '.podkop-watchdog-page .cbi-value{display:block!important;padding:4px 0 10px 0!important;}',
-            '.podkop-watchdog-page input[type="text"],.podkop-watchdog-page input[type="number"],.podkop-watchdog-page select{max-width:420px;}',
+            '.podkop-watchdog-page input[type="text"],.podkop-watchdog-page input[type="number"],.podkop-watchdog-page select{max-width:240px!important;}',
             '.podkop-watchdog-page input[type="checkbox"]{width:16px!important;height:16px!important;max-width:16px!important;min-width:16px!important;display:inline-block!important;margin:0 8px 0 0!important;padding:0!important;}',
             '.podkop-watchdog-page label{background:transparent!important;}',
             '.podkop-watchdog-page .podkop-two-column-row{width:75%!important;}',
@@ -228,7 +228,7 @@ return view.extend({
                 'type':type || 'text',
                 'class':'cbi-input-text',
                 'value':value,
-                'style':'display:block;width:420px;max-width:100%;margin-top:5px;'
+                'style':'display:block;width:240px;max-width:100%;margin-top:5px;'
             });
             input.dataset.option = option;
 
@@ -261,13 +261,13 @@ return view.extend({
         var domainInput = E('input', {
             'type':'text','class':'cbi-input-text',
             'value':uci.get('podkop_watchdog','main','domain') || 'google.com',
-            'style':'display:block;width:100%;box-sizing:border-box;margin-top:5px;'
+            'style':'display:block;width:240px;max-width:100%;box-sizing:border-box;margin-top:5px;'
         });
 
         var intervalInput = E('input', {
             'type':'number','class':'cbi-input-text',
             'value':uci.get('podkop_watchdog','main','check_interval') || '30',
-            'style':'display:block;width:100%;box-sizing:border-box;margin-top:5px;'
+            'style':'display:block;width:240px;max-width:100%;box-sizing:border-box;margin-top:5px;'
         });
 
         checkRow.appendChild(E('div', {
@@ -295,7 +295,7 @@ return view.extend({
 
         var wanSelect = E('select', {
             'class':'cbi-input-select',
-            'style':'display:block;width:100%;box-sizing:border-box;margin-top:5px;'
+            'style':'display:block;width:240px;max-width:100%;box-sizing:border-box;margin-top:5px;'
         });
 
         var currentWan = uci.get('podkop_watchdog','main','wan_interface') || 'wan';
@@ -366,13 +366,13 @@ return view.extend({
         var failInput = E('input', {
             'type':'number','class':'cbi-input-text',
             'value':uci.get('podkop_watchdog','main','fail_limit') || '3',
-            'style':'display:block;width:100%;box-sizing:border-box;margin-top:5px;'
+            'style':'display:block;width:240px;max-width:100%;box-sizing:border-box;margin-top:5px;'
         });
 
         var waitInput = E('input', {
             'type':'number','class':'cbi-input-text',
             'value':uci.get('podkop_watchdog','main','restart_wait') || '20',
-            'style':'display:block;width:100%;box-sizing:border-box;margin-top:5px;'
+            'style':'display:block;width:240px;max-width:100%;box-sizing:border-box;margin-top:5px;'
         });
 
         var restartRow = E('div', {
@@ -401,13 +401,13 @@ return view.extend({
         var rotateInput = E('input', {
             'type':'number','class':'cbi-input-text',
             'value':uci.get('podkop_watchdog','main','rotate_seconds') || '259200',
-            'style':'display:block;width:100%;box-sizing:border-box;margin-top:5px;'
+            'style':'display:block;width:240px;max-width:100%;box-sizing:border-box;margin-top:5px;'
         });
 
         var logInput = E('input', {
             'type':'text','class':'cbi-input-text',
             'value':uci.get('podkop_watchdog','main','log') || '/root/podkop-watchdog.log',
-            'style':'display:block;width:100%;box-sizing:border-box;margin-top:5px;'
+            'style':'display:block;width:240px;max-width:100%;box-sizing:border-box;margin-top:5px;'
         });
 
         var logSettingsRow = E('div', {
