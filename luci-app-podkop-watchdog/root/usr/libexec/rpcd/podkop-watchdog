@@ -1,0 +1,52 @@
+#!/bin/sh
+
+case "$1" in
+	list)
+		echo '{"status":{},"action":{}}'
+		;;
+	call)
+		case "$2" in
+			status)
+				ENABLED="$(uci -q get podkop_watchdog.main.enabled || echo 0)"
+				PID="$(pidof podkop-watchdog.sh | awk '{print $1}')"
+				if [ -n "$PID" ]; then RUNNING=1; else RUNNING=0; fi
+				echo "{\"enabled\":$ENABLED,\"running\":$RUNNING,\"pid\":\"$PID\"}"
+				;;
+			action)
+				ACTION="$(echo "$3" | jsonfilter -e '@.action' 2>/dev/null)"
+				case "$ACTION" in
+					start)
+						/etc/init.d/podkop-watchdog start >/dev/null 2>&1
+						;;
+					stop)
+						/etc/init.d/podkop-watchdog stop >/dev/null 2>&1
+						;;
+					restart)
+						/etc/init.d/podkop-watchdog restart >/dev/null 2>&1
+						;;
+					check)
+						DOMAIN="$(uci -q get podkop_watchdog.main.domain || echo google.com)"
+						if wget -q -T 10 -O /dev/null "https://$DOMAIN/" 2>/dev/null; then
+							echo '{"ok":true,"message":"Проверка успешна"}'
+						else
+							echo '{"ok":false,"message":"Проверка не пройдена"}'
+						fi
+						exit 0
+						;;
+					*)
+						echo '{"error":"unknown action"}'
+						exit 1
+						;;
+				esac
+				echo '{"ok":true}'
+				;;
+			*)
+				echo '{"error":"unknown method"}'
+				exit 1
+				;;
+		esac
+		;;
+	*)
+		exit 1
+		;;
+esac
