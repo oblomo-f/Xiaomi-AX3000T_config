@@ -1,0 +1,13 @@
+{
+	"admin/services/podkop-watchdog": {
+		"title": "Podkop Watchdog",
+		"order": 60,
+		"action": {
+			"type": "view",
+			"path": "podkop-watchdog"
+		},
+		"depends": {
+			"acl": [ "luci-app-podkop-watchdog" ]
+		}
+	}
+}
