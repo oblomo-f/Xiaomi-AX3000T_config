@@ -213,10 +213,32 @@ uninstall_watchdog() {
     esac
 }
 
+install_web() {
+    echo
+    echo "Установка / обновление Web-интерфейса..."
+    if [ -x "./install-luci.sh" ]; then
+        ./install-luci.sh
+    else
+        echo "Ошибка: install-luci.sh не найден."
+        return 1
+    fi
+}
+
+uninstall_web() {
+    echo
+    echo "Удаление Web-интерфейса..."
+    if [ -x "./uninstall-luci.sh" ]; then
+        ./uninstall-luci.sh
+    else
+        echo "Ошибка: uninstall-luci.sh не найден."
+        return 1
+    fi
+}
+
 while true; do
     clear
     echo "=========================================="
-    echo "            Podkop Watchdog"
+    echo "     Xiaomi AX3000T — Podkop Watchdog"
     echo "=========================================="
     echo ""
 
@@ -229,40 +251,32 @@ while true; do
     fi
 
     echo ""
-    echo "  1) Установить / обновить"
+    echo "  1) Установить / обновить Watchdog"
     echo "  2) Проверить статус"
     echo "  3) Перезапустить watchdog"
     echo "  4) Остановить watchdog"
     echo "  5) Изменить домен проверки"
     echo "  6) Показать лог"
-    echo "  7) Удалить"
+    echo
+    echo "  --- Web-интерфейс ---"
+    echo "  7) Установить / обновить Web"
+    echo "  8) Удалить Web"
+    echo
     echo "  0) Выход"
-    echo ""
-    printf "Выберите действие [0-7]: "
+    echo
+    printf "Выберите действие [0-8]: "
     read choice
 
     case "$choice" in
         1) install_watchdog; pause ;;
-        2) check_status; pause ;;
-        3)
-            "$SERVICE" restart >/dev/null 2>&1
-            sleep 1
-            if service_running; then
-                echo "✓ Watchdog перезапущен."
-            else
-                echo "⚠ Watchdog не запустился."
-            fi
-            pause
-            ;;
-        4)
-            "$SERVICE" stop >/dev/null 2>&1
-            echo "✓ Watchdog остановлен."
-            pause
-            ;;
+        2) status_watchdog; pause ;;
+        3) restart_watchdog; pause ;;
+        4) stop_watchdog; pause ;;
         5) change_domain; pause ;;
         6) show_log; pause ;;
-        7) uninstall_watchdog; pause ;;
-        0|q|Q) exit 0 ;;
-        *) echo "Неверный выбор."; sleep 1 ;;
+        7) install_web; pause ;;
+        8) uninstall_web; pause ;;
+        0) exit 0 ;;
+        *) echo "Неверный выбор."; pause ;;
     esac
 done

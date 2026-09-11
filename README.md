@@ -1,4 +1,4 @@
-# Podkop Watchdog
+# Xiaomi AX3000T — Podkop Watchdog
 
 Интерактивный watchdog для OpenWrt + Podkop.
 
@@ -33,7 +33,7 @@ google.com
 
 Успешные проверки в лог не записываются.
 
-После 3 ошибок подряд выполняется перезапуск Podkop:
+После 3 ошибок подряд выполняется:
 
 ```sh
 /etc/init.d/podkop restart
@@ -70,42 +70,5 @@ Watchdog устанавливается как OpenWrt `procd` service и зап
 Удаление доступно из меню, пункт **7**.
 
 ## Репозиторий
-
-
-# Podkop Watchdog + LuCI
-
-Добавляет Web-интерфейс LuCI для управления Podkop Watchdog.
-
-## Что делает
-
-LuCI → Services → Podkop Watchdog:
-
-- статус и PID;
-- запуск / остановка / перезапуск;
-- проверка домена;
-- настройка домена;
-- интервал проверки;
-- количество ошибок до рестарта Podkop;
-- ожидание после рестарта;
-- ротация/очистка лога;
-- просмотр лога.
-
-## Установка
-
-После размещения каталога `luci-app-podkop-watchdog` в ветке `main` репозитория:
-
-```sh
-sh <(wget -O- https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install-luci.sh) install
-```
-
-Или:
-
-```sh
-wget -O /tmp/install-luci.sh https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main/install-luci.sh
-sh /tmp/install-luci.sh install
-```
-
-Важно: `install-luci.sh` загружает файлы из этого же GitHub-репозитория, поэтому каталог `luci-app-podkop-watchdog` должен находиться в `main`.
-
 
 https://github.com/oblomo-f/Xiaomi-AX3000T_config
