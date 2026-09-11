@@ -238,7 +238,7 @@ uninstall_web() {
 while true; do
     clear
     echo "=========================================="
-    echo "     Xiaomi AX3000T — Podkop Watchdog"
+    echo "              Podkop Watchdog"
     echo "=========================================="
     echo ""
 
