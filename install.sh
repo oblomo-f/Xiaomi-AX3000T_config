@@ -1,268 +1,136 @@
 #!/bin/sh
 
 REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
-WATCHDOG="/root/podkop-watchdog.sh"
-SERVICE="/etc/init.d/podkop-watchdog"
-LOG="/root/podkop-watchdog.log"
-ROTATE="/root/podkop-watchdog.rotate"
+LUCI_DIR="/usr/share/luci-app-podkop-watchdog"
 
-pause() {
-    echo ""
-    printf "Нажмите Enter для продолжения..."
-    read dummy
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
+red() { printf '\033[31m%s\033[0m\n' "$*"; }
+
+need_root() {
+    [ "$(id -u)" = "0" ] || {
+        red "Ошибка: запусти от root."
+        exit 1
+    }
 }
 
-service_running() {
-    ps | grep '[p]odkop-watchdog.sh' >/dev/null 2>&1
-}
-
-service_enabled() {
-    [ -L /etc/rc.d/S99podkop-watchdog ] || [ -e /etc/rc.d/S99podkop-watchdog ]
-}
-
-check_status() {
-    echo ""
-    echo "========== Podkop Watchdog =========="
-    if [ -x "$SERVICE" ] && [ -x "$WATCHDOG" ]; then
-        echo "Установлен: ДА"
-    else
-        echo "Установлен: НЕТ"
-    fi
-
-    if service_running; then
-        echo "Статус: ЗАПУЩЕН"
-        ps | grep '[p]odkop-watchdog.sh'
-    else
-        echo "Статус: ОСТАНОВЛЕН"
-    fi
-
-    if service_enabled; then
-        echo "Автозапуск: ВКЛЮЧЁН"
-    else
-        echo "Автозапуск: ВЫКЛЮЧЕН"
-    fi
-
-    echo ""
-    if [ -f "$WATCHDOG" ]; then
-        echo "Настройки:"
-        grep -E '^(DOMAIN|CHECK_INTERVAL|FAIL_LIMIT|RESTART_WAIT|ROTATE_SECONDS)=' "$WATCHDOG" 2>/dev/null
-    fi
-
-    echo ""
-    echo "Лог:"
-    if [ -s "$LOG" ]; then
-        tail -20 "$LOG"
-    else
-        echo "Лог пуст — ошибок не зафиксировано."
-    fi
-
-    echo ""
-    echo "Последние сообщения procd:"
-    logread | grep podkop-watchdog | tail -10
-}
-
-install_watchdog() {
-    echo ""
-    echo "========== Установка / обновление =========="
-
-    if [ "$(id -u)" != "0" ]; then
-        echo "Ошибка: запустите скрипт от root."
+download_file() {
+    url="$1"
+    dst="$2"
+    mkdir -p "$(dirname "$dst")"
+    if ! wget -q -T 20 -O "$dst" "$url"; then
+        red "Ошибка загрузки: $url"
         return 1
-    fi
-
-    if ! command -v wget >/dev/null 2>&1; then
-        echo "Ошибка: требуется wget."
-        return 1
-    fi
-
-    echo -n "[1/4] Загружаю watchdog... "
-    if wget -q -O "$WATCHDOG" "$REPO_RAW/podkop-watchdog.sh"; then
-        chmod +x "$WATCHDOG"
-        echo "OK"
-    else
-        echo "ОШИБКА"
-        rm -f "$WATCHDOG"
-        return 1
-    fi
-
-    echo -n "[2/4] Загружаю init-скрипт... "
-    if wget -q -O "$SERVICE" "$REPO_RAW/etc/init.d/podkop-watchdog"; then
-        chmod +x "$SERVICE"
-        echo "OK"
-    else
-        echo "ОШИБКА"
-        return 1
-    fi
-
-    echo -n "[3/4] Создаю лог... "
-    touch "$LOG" "$ROTATE"
-    echo "OK"
-
-    echo -n "[4/4] Запускаю watchdog... "
-
-    # Не используем вывод enable/restart, чтобы служебные сообщения
-    # OpenWrt не попадали в красивый интерфейс установщика.
-    "$SERVICE" stop >/dev/null 2>&1
-    "$SERVICE" enable >/dev/null 2>&1
-    "$SERVICE" start >/dev/null 2>&1
-
-    sleep 2
-
-    if service_running; then
-        echo "OK"
-    else
-        echo "ОШИБКА"
-        echo ""
-        echo "Watchdog не запустился."
-        echo "Для диагностики:"
-        echo "  logread | grep podkop-watchdog"
-        return 1
-    fi
-
-    echo ""
-    echo "✓ Watchdog успешно установлен / обновлён."
-    if service_enabled; then
-        echo "✓ Автозапуск включён."
-    fi
-    echo "✓ Процесс работает."
-}
-
-change_domain() {
-    echo ""
-    echo "========== Домен проверки =========="
-
-    if [ ! -f "$WATCHDOG" ]; then
-        echo "Watchdog не установлен."
-        return 1
-    fi
-
-    CURRENT_DOMAIN="$(grep '^DOMAIN=' "$WATCHDOG" 2>/dev/null | sed 's/^DOMAIN="//; s/"$//')"
-
-    echo "Текущий домен: $CURRENT_DOMAIN"
-    echo ""
-    printf "Введите новый домен: "
-    read NEW_DOMAIN
-
-    if [ -z "$NEW_DOMAIN" ]; then
-        echo "Домен не указан. Отмена."
-        return 1
-    fi
-
-    case "$NEW_DOMAIN" in
-        *" "*|*"/"*|*"http://"*|*"https://"*)
-            echo "Ошибка: укажите только домен, например google.com"
-            return 1
-            ;;
-    esac
-
-    if ! printf '%s\n' "$NEW_DOMAIN" | grep -Eq '^[A-Za-z0-9.-]+$'; then
-        echo "Ошибка: недопустимые символы в имени домена."
-        return 1
-    fi
-
-    sed -i "s|^DOMAIN=.*|DOMAIN=\"$NEW_DOMAIN\"|" "$WATCHDOG"
-
-    echo ""
-    echo "✓ Домен изменён на: $NEW_DOMAIN"
-    echo ""
-    printf "Перезапустить watchdog для применения? [Y/n]: "
-    read answer
-
-    case "$answer" in
-        n|N)
-            echo "Изменение сохранено. Применится после перезапуска watchdog."
-            ;;
-        *)
-            "$SERVICE" restart >/dev/null 2>&1
-            sleep 1
-            if service_running; then
-                echo "✓ Watchdog перезапущен."
-            else
-                echo "⚠ Watchdog не запустился. Проверьте logread."
-            fi
-            ;;
-    esac
-}
-
-show_log() {
-    echo ""
-    echo "========== Лог Podkop Watchdog =========="
-    if [ -s "$LOG" ]; then
-        tail -50 "$LOG"
-    else
-        echo "Лог пуст — ошибок не зафиксировано."
     fi
 }
 
-uninstall_watchdog() {
-    echo ""
-    echo "========== Удаление =========="
-    printf "Удалить Podkop Watchdog и его лог? [y/N]: "
-    read answer
-
-    case "$answer" in
-        y|Y|д|Д)
-            "$SERVICE" stop >/dev/null 2>&1
-            "$SERVICE" disable >/dev/null 2>&1
-            rm -f "$SERVICE" "$WATCHDOG" "$LOG" "$ROTATE"
-            echo "✓ Podkop Watchdog удалён."
-            ;;
-        *)
-            echo "Отмена."
-            ;;
-    esac
-}
-
-while true; do
-    clear
+install_luci() {
+    echo
     echo "=========================================="
-    echo "              Podkop Watchdog"
+    echo "     Установка LuCI Podkop Watchdog"
     echo "=========================================="
-    echo ""
+    echo
 
-    if service_running; then
-        printf "  Статус: \033[32m● ЗАПУЩЕН\033[0m\\n"
-    elif [ -x "$WATCHDOG" ]; then
-        printf "  Статус: \033[33m○ ОСТАНОВЛЕН\033[0m\\n"
+    # Base watchdog files
+    download_file "$REPO_RAW/luci-app-podkop-watchdog/root/etc/config/podkop_watchdog" \
+        "/etc/config/podkop_watchdog" || return 1
+
+    download_file "$REPO_RAW/luci-app-podkop-watchdog/root/etc/init.d/podkop-watchdog" \
+        "/etc/init.d/podkop-watchdog" || return 1
+
+    download_file "$REPO_RAW/luci-app-podkop-watchdog/root/usr/libexec/podkop-watchdog.sh" \
+        "/usr/libexec/podkop-watchdog.sh" || return 1
+
+    download_file "$REPO_RAW/luci-app-podkop-watchdog/root/usr/libexec/rpcd/podkop-watchdog" \
+        "/usr/libexec/rpcd/podkop-watchdog" || return 1
+
+    download_file "$REPO_RAW/luci-app-podkop-watchdog/root/usr/share/rpcd/acl.d/luci-app-podkop-watchdog.json" \
+        "/usr/share/rpcd/acl.d/luci-app-podkop-watchdog.json" || return 1
+
+    download_file "$REPO_RAW/luci-app-podkop-watchdog/root/usr/share/luci/menu.d/luci-app-podkop-watchdog.json" \
+        "/usr/share/luci/menu.d/luci-app-podkop-watchdog.json" || return 1
+
+    download_file "$REPO_RAW/luci-app-podkop-watchdog/htdocs/luci-static/resources/view/podkop-watchdog/index.js" \
+        "/www/luci-static/resources/view/podkop-watchdog/index.js" || return 1
+
+    chmod 755 /etc/init.d/podkop-watchdog
+    chmod 755 /usr/libexec/podkop-watchdog.sh
+    chmod 755 /usr/libexec/rpcd/podkop-watchdog
+
+    /etc/init.d/rpcd restart >/dev/null 2>&1
+    /etc/init.d/uhttpd restart >/dev/null 2>&1
+
+    /etc/init.d/podkop-watchdog enable >/dev/null 2>&1
+    /etc/init.d/podkop-watchdog restart >/dev/null 2>&1
+
+    echo
+    green "✓ LuCI Podkop Watchdog установлен / обновлён."
+    green "✓ Автозапуск включён."
+    echo
+    echo "LuCI → Services → Podkop Watchdog"
+}
+
+remove_luci() {
+    echo
+    echo "Удаление LuCI Podkop Watchdog..."
+    /etc/init.d/podkop-watchdog stop >/dev/null 2>&1
+    /etc/init.d/podkop-watchdog disable >/dev/null 2>&1
+
+    rm -f \
+      /etc/init.d/podkop-watchdog \
+      /etc/config/podkop_watchdog \
+      /usr/libexec/podkop-watchdog.sh \
+      /usr/libexec/rpcd/podkop-watchdog \
+      /usr/share/rpcd/acl.d/luci-app-podkop-watchdog.json \
+      /usr/share/luci/menu.d/luci-app-podkop-watchdog.json \
+      /www/luci-static/resources/view/podkop-watchdog/index.js
+
+    /etc/init.d/rpcd restart >/dev/null 2>&1
+    /etc/init.d/uhttpd restart >/dev/null 2>&1
+
+    green "✓ LuCI Podkop Watchdog удалён."
+}
+
+status() {
+    echo
+    echo "========== LuCI Podkop Watchdog =========="
+    if [ -f /etc/config/podkop_watchdog ]; then
+        green "Установлен: ДА"
     else
-        printf "  Статус: \033[31m○ НЕ УСТАНОВЛЕН\033[0m\\n"
+        red "Установлен: НЕТ"
+        return
     fi
 
-    echo ""
-    echo "  1) Установить / обновить"
-    echo "  2) Проверить статус"
-    echo "  3) Перезапустить watchdog"
-    echo "  4) Остановить watchdog"
-    echo "  5) Изменить домен проверки"
-    echo "  6) Показать лог"
-    echo "  7) Удалить"
-    echo "  0) Выход"
-    echo ""
-    printf "Выберите действие [0-7]: "
-    read choice
+    if pidof podkop-watchdog.sh >/dev/null 2>&1; then
+        green "Статус: ЗАПУЩЕН"
+        echo "PID: $(pidof podkop-watchdog.sh)"
+    else
+        yellow "Статус: ОСТАНОВЛЕН"
+    fi
 
-    case "$choice" in
-        1) install_watchdog; pause ;;
-        2) check_status; pause ;;
-        3)
-            "$SERVICE" restart >/dev/null 2>&1
-            sleep 1
-            if service_running; then
-                echo "✓ Watchdog перезапущен."
-            else
-                echo "⚠ Watchdog не запустился."
-            fi
-            pause
-            ;;
-        4)
-            "$SERVICE" stop >/dev/null 2>&1
-            echo "✓ Watchdog остановлен."
-            pause
-            ;;
-        5) change_domain; pause ;;
-        6) show_log; pause ;;
-        7) uninstall_watchdog; pause ;;
-        0|q|Q) exit 0 ;;
-        *) echo "Неверный выбор."; sleep 1 ;;
-    esac
-done
+    echo
+    echo "Домен: $(uci -q get podkop_watchdog.main.domain)"
+    echo "Интервал: $(uci -q get podkop_watchdog.main.check_interval) сек."
+    echo "Ошибок до рестарта: $(uci -q get podkop_watchdog.main.fail_limit)"
+    echo "Лог: $(uci -q get podkop_watchdog.main.log)"
+}
+
+need_root
+
+case "$1" in
+    install|update)
+        install_luci
+        ;;
+    remove|uninstall)
+        remove_luci
+        ;;
+    status)
+        status
+        ;;
+    *)
+        echo "Использование:"
+        echo "  $0 install"
+        echo "  $0 remove"
+        echo "  $0 status"
+        ;;
+esac
