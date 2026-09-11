@@ -1,0 +1,111 @@
+#!/bin/sh
+
+LOG="$(uci -q get podkop_watchdog.main.log || echo /root/podkop-watchdog.log)"
+
+json_escape_file() {
+	awk 'BEGIN { ORS="" }
+	{
+		gsub(/\\/, "\\\\");
+		gsub(/"/, "\\\"");
+		printf "%s\\n", $0
+	}' "$1"
+}
+
+status_json() {
+	if pgrep -f '/usr/libexec/podkop-watchdog.sh' >/dev/null 2>&1; then
+		echo '{"running":true}'
+	else
+		echo '{"running":false}'
+	fi
+}
+
+get_action() {
+	# rpcd shell handlers normally receive the declared parameter as $3.
+	# Accept both a plain string ("check") and a JSON object for robustness.
+	if [ -n "$3" ]; then
+		case "$3" in
+			check|start|stop|restart|commit)
+				echo "$3"
+				return
+				;;
+			'{'*)
+				jsonfilter -s "$3" -e '@.action' 2>/dev/null
+				return
+				;;
+		esac
+	fi
+
+	# Fallback for a JSON parameter in another argv position.
+	if [ -n "$4" ]; then
+		case "$4" in
+			check|start|stop|restart|commit)
+				echo "$4"
+				return
+				;;
+			'{'*)
+				jsonfilter -s "$4" -e '@.action' 2>/dev/null
+				return
+				;;
+		esac
+	fi
+}
+
+case "$1" in
+	list)
+		echo '{"status":{},"action":{"action":"String"},"log":{}}'
+		;;
+
+	call)
+		case "$2" in
+			status)
+				status_json
+				;;
+
+			action)
+				ACTION="$(get_action)"
+				case "$ACTION" in
+					start)
+						/etc/init.d/podkop-watchdog start >/dev/null 2>&1
+						echo '{"ok":true}'
+						;;
+					stop)
+						/etc/init.d/podkop-watchdog stop >/dev/null 2>&1
+						echo '{"ok":true}'
+						;;
+					restart)
+						/etc/init.d/podkop-watchdog restart >/dev/null 2>&1
+						echo '{"ok":true}'
+						;;
+					commit)
+						uci commit podkop_watchdog
+						echo '{"ok":true}'
+						;;
+					check)
+						DOMAIN="$(uci -q get podkop_watchdog.main.domain)"
+						[ -n "$DOMAIN" ] || DOMAIN="google.com"
+						DOMAIN="$(printf '%s' "$DOMAIN" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+						if /usr/bin/wget -q -T 10 -O /dev/null "https://$DOMAIN/"; then
+							echo '{"ok":true}'
+						else
+							echo '{"ok":false}'
+						fi
+						;;
+					*)
+						echo '{"ok":false,"error":"unknown action"}'
+						;;
+				esac
+				;;
+
+			log)
+				if [ -r "$LOG" ]; then
+					echo -n '{"text":"'
+					json_escape_file "$LOG"
+					echo '"}'
+				else
+					echo '{"text":""}'
+				fi
+				;;
+		esac
+		;;
+esac
