@@ -1,0 +1,23 @@
+{
+	"luci-app-podkop-watchdog": {
+		"description": "Manage Podkop Watchdog",
+		"read": {
+			"uci": [ "podkop_watchdog" ],
+			"ubus": {
+				"luci": [ "getFeatures" ],
+				"rpcd": [ "list" ],
+				"podkop-watchdog": [ "status", "action", "log" ]
+			},
+			"file": [
+				"/etc/config/podkop_watchdog",
+				"/root/podkop-watchdog.log"
+			]
+		},
+		"write": {
+			"uci": [ "podkop_watchdog" ],
+			"ubus": {
+				"podkop-watchdog": [ "action" ]
+			}
+		}
+	}
+}
