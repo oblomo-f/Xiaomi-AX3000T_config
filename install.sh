@@ -258,7 +258,7 @@ while true; do
     echo "  5) Изменить домен проверки"
     echo "  6) Показать лог"
     echo
-    echo "  --- Web-интерфейс ---"
+    echo "  --- Web-интерфейс luci---"
     echo "  7) Установить / обновить Web"
     echo "  8) Удалить Web"
     echo
