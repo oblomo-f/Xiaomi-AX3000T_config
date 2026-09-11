@@ -35,8 +35,9 @@ config main 'config'
 --hostlist=/opt/zapret/ipset/zapret-hosts-google.txt
 --hostlist=/opt/zapret/ipset/zapret-hosts-user.txt
 --hostlist-exclude-domains=openwrt.org
---dpi-desync=fakedsplit
+--dpi-desync=fake
 --dpi-desync-fooling=badseq
---dpi-desync-split-pos=1
+--dpi-desync-badseq-increment=0
+--dpi-desync-fake-tls-mod=rnd,dupsid,rndsni,padencap
 '
 
