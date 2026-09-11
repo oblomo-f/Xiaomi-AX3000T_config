@@ -398,11 +398,37 @@ return view.extend({
             _('Журнал ошибок watchdog и сообщений о перезапуске.')
         );
 
-        var rotateInput = E('input', {
+        var rotateSeconds = parseInt(uci.get('podkop_watchdog','main','rotate_seconds') || '259200', 10);
+        if (!isFinite(rotateSeconds) || rotateSeconds <= 0)
+            rotateSeconds = 259200;
+        var rotateDays = rotateSeconds / 86400;
+        var rotatePreset = [1,2,3,4,5].indexOf(rotateDays) >= 0 ? String(rotateDays) : 'custom';
+
+        var rotateSelect = E('select', {
+            'class':'cbi-input-select',
+            'style':'display:inline-block;width:150px;max-width:100%;box-sizing:border-box;margin-top:5px;'
+        }, [
+            E('option', {'value':'1'}, _('1 день')),
+            E('option', {'value':'2'}, _('2 дня')),
+            E('option', {'value':'3'}, _('3 дня')),
+            E('option', {'value':'4'}, _('4 дня')),
+            E('option', {'value':'5'}, _('5 дней')),
+            E('option', {'value':'custom'}, _('Ввести вручную'))
+        ]);
+        rotateSelect.value = rotatePreset;
+
+        var rotateCustom = E('input', {
             'type':'number','class':'cbi-input-text',
-            'value':uci.get('podkop_watchdog','main','rotate_seconds') || '259200',
-            'style':'display:block;width:240px;max-width:100%;box-sizing:border-box;margin-top:5px;'
+            'min':'1','step':'1',
+            'value':Math.max(1, Math.round(rotateDays)),
+            'style':'display:inline-block;width:90px;max-width:100%;box-sizing:border-box;margin:5px 0 0 6px;'
         });
+
+        function updateRotateCustom() {
+            rotateCustom.style.display = rotateSelect.value === 'custom' ? 'inline-block' : 'none';
+        }
+        rotateSelect.addEventListener('change', updateRotateCustom);
+        updateRotateCustom();
 
         var logInput = E('input', {
             'type':'text','class':'cbi-input-text',
@@ -415,9 +441,9 @@ return view.extend({
             'style':'display:flex;gap:0;align-items:stretch;width:75%;margin:0 0 18px 0;border:1px solid #ddd;'
         }, [
             E('div', {'style':'flex:1 1 0;width:50%;min-width:0;padding:10px 12px;box-sizing:border-box;background:#f5f5f5;border-right:1px solid #ddd;'}, [
-                E('label', {'style':'display:block;font-weight:bold;margin-bottom:3px;'}, _('Очищать лог через, секунд')),
-                E('div', {'style':'font-size:12px;opacity:.75;margin-bottom:5px;'}, _('259200 секунд = 3 дня. После этого старый лог очищается.')),
-                rotateInput
+                E('label', {'style':'display:block;font-weight:bold;margin-bottom:3px;'}, _('Очищать лог через')),
+                E('div', {'style':'font-size:12px;opacity:.75;margin-bottom:5px;'}, _('Выберите 1–5 дней или укажите количество дней вручную.')),
+                E('div', {}, [rotateSelect, rotateCustom])
             ]),
             E('div', {'style':'flex:1 1 0;width:50%;min-width:0;padding:10px 12px;box-sizing:border-box;background:#f5f5f5;'}, [
                 E('label', {'style':'display:block;font-weight:bold;margin-bottom:3px;'}, _('Файл лога')),
@@ -439,7 +465,12 @@ return view.extend({
                 uci.set('podkop_watchdog','main','wan_interface',wanSelect.value);
                 uci.set('podkop_watchdog','main','fail_limit',failInput.value);
                 uci.set('podkop_watchdog','main','restart_wait',waitInput.value);
-                uci.set('podkop_watchdog','main','rotate_seconds',rotateInput.value);
+                var selectedDays = rotateSelect.value === 'custom'
+                    ? parseInt(rotateCustom.value || '1', 10)
+                    : parseInt(rotateSelect.value, 10);
+                if (!isFinite(selectedDays) || selectedDays < 1)
+                    selectedDays = 1;
+                uci.set('podkop_watchdog','main','rotate_seconds',String(selectedDays * 86400));
                 uci.set('podkop_watchdog','main','log',logInput.value);
 
                 return uci.save().then(function() {
