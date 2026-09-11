@@ -53,8 +53,8 @@ return view.extend({
             '.podkop-watchdog-page label{background:transparent!important;}',
             '.podkop-watchdog-page .podkop-two-column-row{width:75%!important;}',
             '.podkop-watchdog-page .podkop-log-row{width:55%!important;}',
-            '.podkop-watchdog-page .podkop-log-refresh{height:220px;min-height:100px;margin-left:10px;vertical-align:top;}',
-            '@media(max-width:700px){.podkop-watchdog-page .podkop-log-row{width:100%!important;flex-direction:column!important}.podkop-watchdog-page .podkop-log-refresh{height:auto;min-height:0;margin:8px 0 0 0;width:100%;}}',
+            '.podkop-watchdog-page .podkop-log-refresh{height:auto;min-height:0;width:auto;min-width:0;margin-left:8px;padding:6px 12px;align-self:flex-start;white-space:nowrap;}',
+            '@media(max-width:700px){.podkop-watchdog-page .podkop-log-row{width:100%!important;flex-direction:column!important}.podkop-watchdog-page .podkop-log-refresh{height:auto;min-height:0;margin:8px 0 0 0;width:auto;align-self:flex-start;}}',
             '@media(max-width:700px){.podkop-watchdog-page .podkop-two-column-row{flex-direction:column!important}.podkop-watchdog-page .podkop-two-column-row>div{width:100%!important;border-right:0!important;border-bottom:1px solid #ddd!important}}'
         ]);
 
@@ -391,7 +391,7 @@ return view.extend({
         }, _('Обновить лог'));
 
         var logRow = E('div', {
-            'class':'podkop-log-row', 'style':'display:flex;align-items:stretch;margin-top:8px;width:55%;'
+            'class':'podkop-log-row', 'style':'display:flex;align-items:flex-start;margin-top:8px;width:55%;'
         }, [
             E('div', {
                 'style':'flex:1 1 auto; min-width:0;'
