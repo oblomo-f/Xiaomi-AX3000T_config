@@ -1,0 +1,83 @@
+#!/bin/sh
+
+LOG="$(uci -q get podkop_watchdog.main.log || echo /root/podkop-watchdog.log)"
+
+json_escape_file() {
+	awk 'BEGIN { ORS="" }
+	{
+		gsub(/\\/, "\\\\");
+		gsub(/"/, "\\\"");
+		printf "%s\\n", $0
+	}' "$1"
+}
+
+status_json() {
+	if pgrep -f '/usr/libexec/podkop-watchdog.sh' >/dev/null 2>&1; then
+		echo '{"running":true}'
+	else
+		echo '{"running":false}'
+	fi
+}
+
+case "$1" in
+	list)
+		echo '{"status":{},"action":{"action":"String"},"log":{}}'
+		;;
+
+	call)
+		case "$2" in
+			status)
+				status_json
+				;;
+
+			action)
+				case "$3" in
+					start)
+						/etc/init.d/podkop-watchdog start
+						;;
+					stop)
+						/etc/init.d/podkop-watchdog stop
+						;;
+					restart)
+						/etc/init.d/podkop-watchdog restart
+						;;
+					check)
+						if wget -q -T 10 -O /dev/null "https://$(uci -q get podkop_watchdog.main.domain || echo google.com)/"; then
+							echo '{"ok":true}'
+						else
+							echo '{"ok":false}'
+						fi
+						;;
+
+					uninstall)
+						/etc/init.d/podkop-watchdog stop 2>/dev/null || true
+						/etc/init.d/podkop-watchdog disable 2>/dev/null || true
+						rm -f /etc/init.d/podkop-watchdog
+						rm -f /usr/libexec/podkop-watchdog.sh
+						rm -f /usr/libexec/rpcd/podkop-watchdog
+						rm -f /www/luci-static/resources/view/podkop-watchdog.js
+						rm -rf /www/luci-static/resources/view/podkop-watchdog
+						rm -f /usr/share/luci/menu.d/luci-app-podkop-watchdog.json
+						rm -f /usr/share/rpcd/acl.d/luci-app-podkop-watchdog.json
+						rm -f /etc/config/podkop_watchdog
+						rm -f /root/podkop-watchdog.log
+						rm -rf /tmp/luci-indexcache /tmp/luci-modulecache
+						/etc/init.d/rpcd restart 2>/dev/null || true
+						/etc/init.d/uhttpd restart 2>/dev/null || true
+						echo '{"ok":true}'
+						;;
+				esac
+				;;
+
+			log)
+				if [ -r "$LOG" ]; then
+					echo -n '{"text":"'
+					json_escape_file "$LOG"
+					echo '"}'
+				else
+					echo '{"text":""}'
+				fi
+				;;
+		esac
+		;;
+esac
