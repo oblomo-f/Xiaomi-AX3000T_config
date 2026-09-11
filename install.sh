@@ -374,7 +374,7 @@ install_menu_command
 while true; do
     clear
     echo "=========================================="
-    echo "     Xiaomi AX3000T — Podkop Watchdog"
+    echo "            Podkop Watchdog"
     echo "=========================================="
     echo ""
 
