@@ -97,7 +97,11 @@ var statusEl = document.getElementById('podkop-watchdog-status');
 
             if (podkopEl) {
                 podkopEl.textContent = st.podkop_installed !== true ? 'Podkop: Не установлен' : (st.podkop_running === true ? 'Podkop: Установлен и работает.' : 'Podkop: Установлен, но не работает.');
-                podkopEl.style = st.podkop_installed !== true ? 'font-weight:700;color:#c62828;' : (st.podkop_running === true ? 'font-weight:700;color:#2e7d32;' : 'font-weight:700;color:#f9a825;');
+                podkopEl.style = st.podkop_installed !== true
+                    ? 'font-weight:700;color:#c62828;'
+                    : (st.podkop_running === true
+                        ? 'font-weight:700;color:#2e7d32;'
+                        : 'font-weight:700;color:#f9a825;');
             }
 
             if (statusEl) {
