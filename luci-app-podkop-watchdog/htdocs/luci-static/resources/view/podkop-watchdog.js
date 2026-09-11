@@ -92,16 +92,21 @@ return view.extend({
         function updateControls(st) {
             st = st || {};
             var running = st.running === true && st.enabled !== false;
-            var statusEl = document.getElementById('podkop-watchdog-status');
+            var watchdogRunningGreenStyle = document.createElement('style');
+watchdogRunningGreenStyle.textContent = '.podkop-watchdog-running-green { color:#2e7d32 !important; font-weight:700; }';
+document.head.appendChild(watchdogRunningGreenStyle);
+var statusEl = document.getElementById('podkop-watchdog-status');
             var podkopEl = document.getElementById('podkop-installed-status');
 
             if (podkopEl) {
                 podkopEl.textContent = st.podkop_installed !== true ? 'Podkop: Не установлен' : (st.podkop_running === true ? 'Podkop: Установлен и работает.' : 'Podkop: Установлен, но не работает.');
-                podkopEl.style = st.podkop_installed !== true ? 'font-weight:700;color:#c62828;' : (st.podkop_running === true ? 'font-weight:700;color:#2e7d32;' : 'font-weight:700;color:#c62828;');
+                podkopEl.style = st.podkop_installed !== true ? 'font-weight:700;color:#c62828;' : (st.podkop_running === true ? 'font-weight:700;color:#2e7d32;' : 'font-weight:700;color:#f9a825;');color:#c62828;' : (st.podkop_running === true ? 'font-weight:700;color:#2e7d32;' : 'font-weight:700;color:#c62828;');color:#c62828;' : (st.podkop_running === true ? 'font-weight:700;color:#2e7d32;' : 'font-weight:700;color:#c62828;');
             }
 
             if (statusEl) {
                 statusEl.textContent = running ? '● Запущен' : '● Остановлен';
+                statusEl.classList.toggle('podkop-watchdog-running-green', st.running === true);
+
                 statusEl.style = running
                     ? 'font-weight:700;color:#2e7d32;'
                     : 'font-weight:700;color:#c62828;';
