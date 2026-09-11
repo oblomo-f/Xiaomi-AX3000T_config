@@ -286,16 +286,9 @@ return view.extend({
             _('При недоступности указанного домена можно автоматически переподнять WAN-интерфейс.')
         );
 
-        var restartWanInput = addField(
-            'restart_wan',
-            _('Перезапускать WAN при отсутствии интернета'),
-            _('Если включено, после заданного количества ошибок watchdog выполнит ifdown/ifup выбранного WAN-интерфейса, затем перезапустит Podkop.'),
-            'checkbox'
-        );
-
         var wanSelect = E('select', {
             'class':'cbi-input-select',
-            'style':'display:block;width:420px;max-width:100%;margin-top:5px;'
+            'style':'display:block;width:100%;box-sizing:border-box;margin-top:5px;'
         });
 
         var currentWan = uci.get('podkop_watchdog','main','wan_interface') || 'wan';
@@ -324,12 +317,39 @@ return view.extend({
         else if (seen['wan'])
             wanSelect.value = 'wan';
 
-        var wanBlock = E('div', {'style':'margin:0 0 18px 0;'}, [
+        var wanRow = E('div', {
+            'class':'podkop-two-column-row',
+            'style':'display:flex;gap:0;align-items:stretch;width:75%;margin:0 0 18px 0;border:1px solid #ddd;'
+        });
+
+        var restartWanInput = E('input', {
+            'type':'checkbox',
+            'style':'width:16px!important;height:16px!important;min-width:16px!important;max-width:16px!important;display:inline-block!important;margin:0 8px 0 0!important;padding:0!important;vertical-align:middle!important;'
+        });
+        restartWanInput.checked = (uci.get('podkop_watchdog','main','restart_wan') || '0') === '1';
+        restartWanInput.dataset.option = 'restart_wan';
+
+        wanRow.appendChild(E('div', {
+            'style':'flex:1 1 0;width:50%;min-width:0;padding:10px 12px;box-sizing:border-box;background:#f5f5f5;border-right:1px solid #ddd;'
+        }, [
+            E('label', {
+                'style':'display:flex!important;align-items:center!important;width:auto!important;height:auto!important;background:transparent!important;border:0!important;padding:0!important;margin:0 0 5px 0!important;font-weight:700!important;cursor:pointer;'
+            }, [
+                restartWanInput,
+                E('span', {}, _('Перезапускать WAN при отсутствии интернета'))
+            ]),
+            E('div', {'style':'font-size:12px;opacity:.75;margin:0;'}, _('После заданного количества ошибок выполнить ifdown/ifup WAN, затем перезапустить Podkop.'))
+        ]));
+
+        wanRow.appendChild(E('div', {
+            'style':'flex:1 1 0;width:50%;min-width:0;padding:10px 12px;box-sizing:border-box;background:#f5f5f5;'
+        }, [
             E('label', {'style':'display:block;font-weight:bold;margin-bottom:3px;'}, _('WAN интерфейс')),
-            E('div', {'style':'font-size:12px;opacity:.75;margin-bottom:5px;'}, _('Обязательный логический интерфейс OpenWrt, который будет переподнят. По умолчанию: wan.')),
+            E('div', {'style':'font-size:12px;opacity:.75;margin-bottom:5px;'}, _('Логический интерфейс OpenWrt для переподнятия. По умолчанию: wan.')),
             wanSelect
-        ]);
-        settings.appendChild(wanBlock);
+        ]));
+
+        settings.appendChild(wanRow);
 
         addHeader(
             _('Перезапуск Podkop'),
