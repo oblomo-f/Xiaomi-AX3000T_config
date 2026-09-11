@@ -12,11 +12,28 @@ json_escape_file() {
 }
 
 status_json() {
+	ENABLED="$(uci -q get podkop_watchdog.main.enabled)"
+	[ "$ENABLED" = "1" ] || ENABLED="0"
+
 	if pgrep -f '/usr/libexec/podkop-watchdog.sh' >/dev/null 2>&1; then
-		echo '{"running":true}'
+		RUNNING="1"
 	else
-		echo '{"running":false}'
+		RUNNING="0"
 	fi
+
+	if [ "$RUNNING" = "1" ]; then
+		RUNNING_JSON=true
+	else
+		RUNNING_JSON=false
+	fi
+
+	if [ "$ENABLED" = "1" ]; then
+		ENABLED_JSON=true
+	else
+		ENABLED_JSON=false
+	fi
+
+	printf '{"running":%s,"enabled":%s}\n' "$RUNNING_JSON" "$ENABLED_JSON"
 }
 
 get_action() {

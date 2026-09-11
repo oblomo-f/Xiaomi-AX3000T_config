@@ -6,7 +6,7 @@ REPO_RAW="https://raw.githubusercontent.com/oblomo-f/Xiaomi-AX3000T_config/main"
 VIEW_DIR="/www/luci-static/resources/view"
 VIEW_FILE="$VIEW_DIR/podkop-watchdog.js"
 
-echo "=== Podkop Watchdog LuCI installer v41 ==="
+echo "=== Podkop Watchdog LuCI installer v43 ==="
 
 if [ "$1" = "remove" ] || [ "$1" = "uninstall" ]; then
     sh <(wget -O- "$REPO_RAW/uninstall-luci.sh")
