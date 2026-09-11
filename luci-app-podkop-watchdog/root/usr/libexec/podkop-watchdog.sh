@@ -26,9 +26,22 @@ restart_wan() {
 	fi
 
 	log "Restarting WAN interface: $WAN_INTERFACE"
-	/usr/sbin/ifdown "$WAN_INTERFACE" 2>>"$LOG" || true
+	IFDOWN="$(command -v ifdown 2>/dev/null || echo /sbin/ifdown)"
+	IFUP="$(command -v ifup 2>/dev/null || echo /sbin/ifup)"
+
+	if [ -x "$IFDOWN" ]; then
+		"$IFDOWN" "$WAN_INTERFACE" 2>>"$LOG" || log "ifdown failed for $WAN_INTERFACE"
+	else
+		log "ERROR: ifdown not found"
+	fi
+
 	sleep 3
-	/usr/sbin/ifup "$WAN_INTERFACE" 2>>"$LOG" || true
+
+	if [ -x "$IFUP" ]; then
+		"$IFUP" "$WAN_INTERFACE" 2>>"$LOG" || log "ifup failed for $WAN_INTERFACE"
+	else
+		log "ERROR: ifup not found"
+	fi
 }
 
 while true; do

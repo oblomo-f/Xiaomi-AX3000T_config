@@ -13,7 +13,7 @@ pause() {
 }
 
 service_running() {
-    ps | grep '[p]odkop-watchdog.sh' >/dev/null 2>&1
+    pgrep -f 'podkop-watchdog.sh' >/dev/null 2>&1
 }
 
 service_enabled() {
@@ -31,7 +31,7 @@ check_status() {
 
     if service_running; then
         echo "Статус: ЗАПУЩЕН"
-        ps | grep '[p]odkop-watchdog.sh'
+        pgrep -f 'podkop-watchdog.sh'
     else
         echo "Статус: ОСТАНОВЛЕН"
     fi
@@ -318,7 +318,8 @@ change_domain() {
         return 1
     fi
 
-    sed -i "s|^DOMAIN=.*|DOMAIN=\"$NEW_DOMAIN\"|" "$WATCHDOG"
+    uci -q set podkop_watchdog.main.domain="$NEW_DOMAIN"
+    uci -q commit podkop_watchdog
 
     echo ""
     echo "✓ Домен изменён на: $NEW_DOMAIN"

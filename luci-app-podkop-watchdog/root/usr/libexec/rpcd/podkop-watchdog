@@ -20,7 +20,7 @@ status_json() {
 		/etc/init.d/podkop-watchdog stop >/dev/null 2>&1 || true
 	fi
 
-	if pgrep -f '/usr/libexec/podkop-watchdog.sh' >/dev/null 2>&1; then
+	if pgrep -f 'podkop-watchdog.sh' >/dev/null 2>&1; then
 		RUNNING="1"
 	else
 		RUNNING="0"
@@ -62,7 +62,7 @@ case "$1" in
 					stop)
 						/etc/init.d/podkop-watchdog stop >/dev/null 2>&1 || true
 						sleep 1
-						for pid in $(pgrep -f '/usr/libexec/podkop-watchdog.sh' 2>/dev/null); do
+						for pid in $(pgrep -f 'podkop-watchdog.sh' 2>/dev/null); do
 							kill "$pid" 2>/dev/null || true
 						done
 						uci -q set podkop_watchdog.main.enabled='0'

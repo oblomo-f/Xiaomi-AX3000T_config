@@ -53,6 +53,7 @@ return view.extend({
             '.podkop-watchdog-page label{background:transparent!important;}',
             '.podkop-watchdog-page .podkop-two-column-row{width:75%!important;}',
             '.podkop-watchdog-page .podkop-log-row{width:55%!important;}',
+            '.podkop-watchdog-page #podkop-watchdog-log{color:#e6e6e6!important;background:#111!important;font-family:monospace!important;font-size:13px!important;line-height:1.45!important;border:1px solid #333!important;box-sizing:border-box!important;}',
             '.podkop-watchdog-page .podkop-log-refresh{height:auto;min-height:0;width:auto;min-width:0;margin-left:8px;padding:6px 12px;align-self:flex-start;white-space:nowrap;}',
             '@media(max-width:700px){.podkop-watchdog-page .podkop-log-row{width:100%!important;flex-direction:column!important}.podkop-watchdog-page .podkop-log-refresh{height:auto;min-height:0;margin:8px 0 0 0;width:auto;align-self:flex-start;}}',
             '@media(max-width:700px){.podkop-watchdog-page .podkop-two-column-row{flex-direction:column!important}.podkop-watchdog-page .podkop-two-column-row>div{width:100%!important;border-right:0!important;border-bottom:1px solid #ddd!important}}'
@@ -285,7 +286,7 @@ return view.extend({
             'style':'display:block;width:420px;max-width:100%;margin-top:5px;'
         });
 
-        var currentWan = 'wan';
+        var currentWan = uci.get('podkop_watchdog','main','wan_interface') || 'wan';
         var seen = {};
 
         function addWanOption(name, label) {
@@ -306,7 +307,9 @@ return view.extend({
                 addWanOption(name, name);
         });
 
-        if (seen['wan'])
+        if (seen[currentWan])
+            wanSelect.value = currentWan;
+        else if (seen['wan'])
             wanSelect.value = 'wan';
 
         var wanBlock = E('div', {'style':'margin:0 0 18px 0;'}, [

@@ -7,7 +7,7 @@ stop_service() {
     # Ensure the watchdog process is really terminated.
     procd_kill 2>/dev/null || true
     sleep 1
-    for pid in $(pgrep -f '/(root|usr/libexec)/podkop-watchdog.sh' 2>/dev/null); do
+    for pid in $(pgrep -f 'podkop-watchdog.sh' 2>/dev/null); do
         [ "$pid" = "$$" ] && continue
         kill "$pid" 2>/dev/null || true
     done

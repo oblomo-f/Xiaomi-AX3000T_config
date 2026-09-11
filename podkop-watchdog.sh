@@ -1,53 +1,75 @@
 #!/bin/sh
 
-# Podkop Watchdog
-# Internet check by domain.
-# 3 consecutive failures -> Podkop restart.
-
-DOMAIN="$(uci -q get podkop_watchdog.main.domain 2>/dev/null || echo google.com)"
-CHECK_INTERVAL=30
-FAIL_LIMIT=3
-RESTART_WAIT=20
-ROTATE_SECONDS=259200
-
-LOG="/root/podkop-watchdog.log"
-ROTATE="/root/podkop-watchdog.rotate"
-
-touch "$LOG"
-touch "$ROTATE"
-
-rotate_log() {
-    NOW="$(date +%s)"
-    LAST_ROTATE="$(cat "$ROTATE" 2>/dev/null)"
-
-    if [ -z "$LAST_ROTATE" ] || [ $((NOW - LAST_ROTATE)) -ge "$ROTATE_SECONDS" ]; then
-        : > "$LOG"
-        echo "$NOW" > "$ROTATE"
-    fi
-}
+CONFIG="podkop_watchdog"
+DOMAIN="$(uci -q get ${CONFIG}.main.domain 2>/dev/null || echo google.com)"
+CHECK_INTERVAL="$(uci -q get ${CONFIG}.main.check_interval || echo 30)"
+FAIL_LIMIT="$(uci -q get ${CONFIG}.main.fail_limit || echo 3)"
+RESTART_WAIT="$(uci -q get ${CONFIG}.main.restart_wait || echo 20)"
+ROTATE_SECONDS="$(uci -q get ${CONFIG}.main.rotate_seconds || echo 259200)"
+LOG="$(uci -q get ${CONFIG}.main.log || echo /root/podkop-watchdog.log)"
+WAN_INTERFACE="$(uci -q get ${CONFIG}.main.wan_interface || echo wan)"
+RESTART_WAN="$(uci -q get ${CONFIG}.main.restart_wan || echo 0)"
 
 FAIL=0
+START_TIME="$(date +%s)"
+
+mkdir -p "$(dirname "$LOG")"
+touch "$LOG"
+
+log() {
+	echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"
+}
+
+restart_wan() {
+	if [ "$RESTART_WAN" != "1" ] || [ -z "$WAN_INTERFACE" ]; then
+		return 0
+	fi
+
+	log "Restarting WAN interface: $WAN_INTERFACE"
+	IFDOWN="$(command -v ifdown 2>/dev/null || echo /sbin/ifdown)"
+	IFUP="$(command -v ifup 2>/dev/null || echo /sbin/ifup)"
+
+	if [ -x "$IFDOWN" ]; then
+		"$IFDOWN" "$WAN_INTERFACE" 2>>"$LOG" || log "ifdown failed for $WAN_INTERFACE"
+	else
+		log "ERROR: ifdown not found"
+	fi
+
+	sleep 3
+
+	if [ -x "$IFUP" ]; then
+		"$IFUP" "$WAN_INTERFACE" 2>>"$LOG" || log "ifup failed for $WAN_INTERFACE"
+	else
+		log "ERROR: ifup not found"
+	fi
+}
 
 while true; do
-    # Read the current domain from UCI so Shell and LuCI always use the same setting.
-    DOMAIN="$(uci -q get podkop_watchdog.main.domain 2>/dev/null || echo google.com)"
-    [ -n "$DOMAIN" ] || DOMAIN="google.com"
-    rotate_log
+	now="$(date +%s)"
 
-    if wget -q -O /dev/null --timeout=5 "https://$DOMAIN"; then
-        FAIL=0
-    else
-        FAIL=$((FAIL + 1))
-        echo "$(date '+%Y-%m-%d %H:%M:%S') Internet check failed: $DOMAIN ($FAIL/$FAIL_LIMIT)" >> "$LOG"
-    fi
+	if [ $((now - START_TIME)) -ge "$ROTATE_SECONDS" ]; then
+		: > "$LOG"
+		START_TIME="$now"
+	fi
 
-    if [ "$FAIL" -ge "$FAIL_LIMIT" ]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') Internet unavailable, restarting Podkop" >> "$LOG"
-        /etc/init.d/podkop restart
-        sleep "$RESTART_WAIT"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') Podkop restart completed" >> "$LOG"
-        FAIL=0
-    fi
+	if wget -q -T 10 -O /dev/null "https://$DOMAIN/"; then
+		FAIL=0
+	else
+		FAIL=$((FAIL + 1))
+		log "Internet check failed: $DOMAIN ($FAIL/$FAIL_LIMIT)"
 
-    sleep "$CHECK_INTERVAL"
+		if [ "$FAIL" -ge "$FAIL_LIMIT" ]; then
+			if [ "$RESTART_WAN" = "1" ]; then
+				restart_wan
+				sleep "$RESTART_WAIT"
+			fi
+
+			log "Restarting Podkop after $FAIL_LIMIT failed checks"
+			/etc/init.d/podkop restart
+			sleep "$RESTART_WAIT"
+			FAIL=0
+		fi
+	fi
+
+	sleep "$CHECK_INTERVAL"
 done
