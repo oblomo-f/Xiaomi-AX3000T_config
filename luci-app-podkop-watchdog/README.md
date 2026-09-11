@@ -10,3 +10,9 @@ Fixes in v9:
 - old nested `view/podkop-watchdog/index.js` is removed by the installer.
 
 After installation, clear the LuCI cache and reload the page.
+
+
+v10:
+- исправлены подписи полей LuCI: используется `title`, а не `caption`;
+- добавлены понятные описания каждого параметра;
+- функциональность v9 сохранена: лог через ubus RPC, PID скрыт.

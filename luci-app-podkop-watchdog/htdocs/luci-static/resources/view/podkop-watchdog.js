@@ -94,38 +94,44 @@ return view.extend({
         s.anonymous = true;
 
         s.option(form.Flag, 'enabled', {
-            caption: _('Watchdog включён'),
-            description: _('Автоматический запуск watchdog.')
+            title: _('Включить Watchdog'),
+            description: _('Если включено — watchdog автоматически запускается вместе с роутером и следит за доступом в интернет.')
         });
 
         s.option(form.Value, 'domain', {
-            caption: _('Домен для проверки'),
+            title: _('Домен для проверки'),
+            description: _('Этот домен используется для проверки доступности интернета. Например: google.com или ya.ru.'),
             datatype: 'host',
             placeholder: 'google.com'
         });
 
         s.option(form.Value, 'check_interval', {
-            caption: _('Интервал проверки (сек.)'),
+            title: _('Интервал проверки'),
+            description: _('Как часто выполнять проверку интернета, в секундах. Сейчас: 30 сек.'),
             datatype: 'uinteger'
         });
 
         s.option(form.Value, 'fail_limit', {
-            caption: _('Количество ошибок до перезапуска'),
+            title: _('Ошибок до перезапуска Podkop'),
+            description: _('Сколько проверок подряд должны завершиться ошибкой. Сейчас: 3 ошибки подряд.'),
             datatype: 'uinteger'
         });
 
         s.option(form.Value, 'restart_wait', {
-            caption: _('Ожидание после перезапуска (сек.)'),
+            title: _('Пауза после перезапуска Podkop'),
+            description: _('Сколько секунд ждать после перезапуска Podkop перед продолжением проверок.'),
             datatype: 'uinteger'
         });
 
         s.option(form.Value, 'rotate_seconds', {
-            caption: _('Очистка лога каждые (сек.)'),
+            title: _('Очистка лога'),
+            description: _('Через сколько секунд очищать старый лог. 259200 сек. = 3 дня.'),
             datatype: 'uinteger'
         });
 
         s.option(form.Value, 'log', {
-            caption: _('Файл лога'),
+            title: _('Файл лога'),
+            description: _('Файл, в который watchdog записывает ошибки проверки и перезапуски Podkop.'),
             datatype: 'string'
         });
 
