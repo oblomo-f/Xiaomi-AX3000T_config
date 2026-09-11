@@ -230,19 +230,37 @@ install_watchdog() {
         return 1
     fi
 
-    echo -n "[3/4] Создаю лог... "
+    echo -n "[3/4] Подготавливаю конфигурацию и лог... "
+    mkdir -p /etc/config
+    if [ ! -f /etc/config/podkop_watchdog ]; then
+        cat > /etc/config/podkop_watchdog <<'EOF'
+config podkop_watchdog 'main'
+	option enabled '1'
+	option domain 'google.com'
+	option check_interval '30'
+	option fail_limit '3'
+	option restart_wait '20'
+	option wan_interface 'wan'
+	option restart_wan '0'
+	option rotate_seconds '259200'
+	option log '/root/podkop-watchdog.log'
+EOF
+    else
+        uci -q set podkop_watchdog.main.enabled='1'
+        uci -q commit podkop_watchdog
+    fi
     touch "$LOG" "$ROTATE"
     echo "OK"
 
     echo -n "[4/4] Запускаю watchdog... "
 
-    # Не используем вывод enable/restart, чтобы служебные сообщения
-    # OpenWrt не попадали в красивый интерфейс установщика.
-    "$SERVICE" stop >/dev/null 2>&1
-    "$SERVICE" enable >/dev/null 2>&1
-    "$SERVICE" start >/dev/null 2>&1
+    # Полностью останавливаем старый экземпляр, затем включаем автозапуск
+    # и запускаем службу.
+    "$SERVICE" stop >/dev/null 2>&1 || true
+    "$SERVICE" enable >/dev/null 2>&1 || true
+    "$SERVICE" restart >/dev/null 2>&1 || true
 
-    sleep 2
+    sleep 3
 
     if service_running; then
         echo "OK"
@@ -402,8 +420,18 @@ while true; do
             pause
             ;;
         4)
-            "$SERVICE" stop >/dev/null 2>&1
-            echo "✓ Watchdog остановлен."
+            "$SERVICE" stop >/dev/null 2>&1 || true
+            sleep 1
+            for pid in $(pgrep -f '/(root|usr/libexec)/podkop-watchdog.sh' 2>/dev/null); do
+                [ "$pid" = "$$" ] && continue
+                kill "$pid" 2>/dev/null || true
+            done
+            sleep 1
+            if service_running; then
+                echo "⚠ Watchdog не удалось остановить."
+            else
+                echo "✓ Watchdog остановлен."
+            fi
             pause
             ;;
         5) change_domain; pause ;;

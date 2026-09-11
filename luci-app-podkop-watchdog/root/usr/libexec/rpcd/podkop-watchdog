@@ -54,15 +54,25 @@ case "$1" in
 				ACTION="$(get_action)"
 				case "$ACTION" in
 					start)
-						/etc/init.d/podkop-watchdog start >/dev/null 2>&1
+						uci -q set podkop_watchdog.main.enabled='1'
+						uci -q commit podkop_watchdog
+						/etc/init.d/podkop-watchdog start >/dev/null 2>&1 || true
 						echo '{"ok":true}'
 						;;
 					stop)
-						/etc/init.d/podkop-watchdog stop >/dev/null 2>&1
+						/etc/init.d/podkop-watchdog stop >/dev/null 2>&1 || true
+						sleep 1
+						for pid in $(pgrep -f '/usr/libexec/podkop-watchdog.sh' 2>/dev/null); do
+							kill "$pid" 2>/dev/null || true
+						done
+						uci -q set podkop_watchdog.main.enabled='0'
+						uci -q commit podkop_watchdog
 						echo '{"ok":true}'
 						;;
 					restart)
-						/etc/init.d/podkop-watchdog restart >/dev/null 2>&1
+						uci -q set podkop_watchdog.main.enabled='1'
+						uci -q commit podkop_watchdog
+						/etc/init.d/podkop-watchdog restart >/dev/null 2>&1 || true
 						echo '{"ok":true}'
 						;;
 					commit)
