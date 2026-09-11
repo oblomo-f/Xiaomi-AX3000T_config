@@ -4,7 +4,7 @@
 # Internet check by domain.
 # 3 consecutive failures -> Podkop restart.
 
-DOMAIN="google.com"
+DOMAIN="$(uci -q get podkop_watchdog.main.domain 2>/dev/null || echo google.com)"
 CHECK_INTERVAL=30
 FAIL_LIMIT=3
 RESTART_WAIT=20
@@ -29,6 +29,9 @@ rotate_log() {
 FAIL=0
 
 while true; do
+    # Read the current domain from UCI so Shell and LuCI always use the same setting.
+    DOMAIN="$(uci -q get podkop_watchdog.main.domain 2>/dev/null || echo google.com)"
+    [ -n "$DOMAIN" ] || DOMAIN="google.com"
     rotate_log
 
     if wget -q -O /dev/null --timeout=5 "https://$DOMAIN"; then

@@ -45,7 +45,8 @@ check_status() {
     echo ""
     if [ -f "$WATCHDOG" ]; then
         echo "Настройки:"
-        grep -E '^(DOMAIN|CHECK_INTERVAL|FAIL_LIMIT|RESTART_WAIT|ROTATE_SECONDS)=' "$WATCHDOG" 2>/dev/null
+        echo "DOMAIN=$(uci -q get podkop_watchdog.main.domain || echo google.com)"
+        grep -E '^(CHECK_INTERVAL|FAIL_LIMIT|RESTART_WAIT|ROTATE_SECONDS)=' "$WATCHDOG" 2>/dev/null
     fi
 
     echo ""
@@ -292,7 +293,8 @@ change_domain() {
         return 1
     fi
 
-    CURRENT_DOMAIN="$(grep '^DOMAIN=' "$WATCHDOG" 2>/dev/null | sed 's/^DOMAIN="//; s/"$//')"
+    CURRENT_DOMAIN="$(uci -q get podkop_watchdog.main.domain 2>/dev/null)"
+    [ -n "$CURRENT_DOMAIN" ] || CURRENT_DOMAIN="google.com"
 
     echo "Текущий домен: $CURRENT_DOMAIN"
     echo ""
@@ -374,7 +376,7 @@ install_menu_command
 while true; do
     clear
     echo "=========================================="
-    echo "            Podkop Watchdog"
+    echo "     Xiaomi AX3000T — Podkop Watchdog"
     echo "=========================================="
     echo ""
 

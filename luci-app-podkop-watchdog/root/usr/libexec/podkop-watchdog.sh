@@ -1,7 +1,7 @@
 #!/bin/sh
 
 CONFIG="podkop_watchdog"
-DOMAIN="$(uci -q get ${CONFIG}.main.domain || echo google.com)"
+DOMAIN="$(uci -q get ${CONFIG}.main.domain 2>/dev/null || echo google.com)"
 CHECK_INTERVAL="$(uci -q get ${CONFIG}.main.check_interval || echo 30)"
 FAIL_LIMIT="$(uci -q get ${CONFIG}.main.fail_limit || echo 3)"
 RESTART_WAIT="$(uci -q get ${CONFIG}.main.restart_wait || echo 20)"
