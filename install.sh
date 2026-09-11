@@ -117,6 +117,55 @@ uninstall_web() {
     fi
 }
 
+uninstall_all() {
+    echo ""
+    echo "========== Полное удаление =========="
+    echo "Будут удалены Watchdog (Shell) и Web-интерфейс."
+    echo ""
+    printf "Вы уверены? [y/N]: "
+    read answer
+    case "$answer" in
+        y|Y|д|Д)
+            ;;
+        *)
+            echo "Удаление отменено."
+            return 0
+            ;;
+    esac
+
+    echo ""
+    echo "[1/2] Удаляю Web-интерфейс..."
+    TMP_WEB="/tmp/uninstall-luci.sh"
+    if command -v wget >/dev/null 2>&1 && wget -q -O "$TMP_WEB" "$REPO_RAW/uninstall-luci.sh"; then
+        chmod +x "$TMP_WEB"
+        sh "$TMP_WEB"
+        rm -f "$TMP_WEB"
+    else
+        echo "Web-удаление недоступно или Web уже удалён."
+        rm -f "$TMP_WEB"
+    fi
+
+    echo ""
+    echo "[2/2] Удаляю Watchdog (Shell)..."
+    if [ -x "$SERVICE" ]; then
+        "$SERVICE" stop >/dev/null 2>&1 || true
+    fi
+
+    # Disable autostart and remove watchdog files/config/logs.
+    if [ -x "$SERVICE" ]; then
+        "$SERVICE" disable >/dev/null 2>&1 || true
+    fi
+    rm -f "$SERVICE" "$WATCHDOG" "$LOG" "$ROTATE"
+    rm -f /etc/config/podkop_watchdog
+    rm -f /usr/libexec/podkop-watchdog.sh
+    rm -f /usr/libexec/rpcd/podkop-watchdog
+    rm -f /etc/uci-defaults/*podkop*watchdog* 2>/dev/null || true
+    rm -f /etc/rc.d/S99podkop-watchdog /etc/rc.d/K99podkop-watchdog 2>/dev/null || true
+
+    echo ""
+    echo "✓ Watchdog Shell и Web-интерфейс полностью удалены."
+}
+
 install_watchdog() {
     echo ""
     echo "========== Установка / обновление =========="
@@ -272,7 +321,7 @@ uninstall_watchdog() {
 while true; do
     clear
     echo "=========================================="
-    echo "            Podkop Watchdog"
+    echo "     Xiaomi AX3000T — Podkop Watchdog"
     echo "=========================================="
     echo ""
 
@@ -295,10 +344,11 @@ while true; do
     echo "  --- Web-интерфейс ---"
     echo "  7) Установить / обновить Web"
     echo "  8) Удалить Web"
+    echo "  9) Удалить полностью (Web + Shell)"
     echo
     echo "  0) Выход"
     echo ""
-    printf "Выберите действие [0-8]: "
+    printf "Выберите действие [0-9]: "
     read choice
 
     case "$choice" in
@@ -323,6 +373,7 @@ while true; do
         6) show_log; pause ;;
         7) install_web; pause ;;
         8) uninstall_web; pause ;;
+        9) uninstall_all; pause ;;
         0|q|Q) exit 0 ;;
         *) echo "Неверный выбор."; sleep 1 ;;
     esac
