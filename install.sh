@@ -120,7 +120,7 @@ uninstall_web() {
 uninstall_all() {
     echo ""
     echo "========== Полное удаление =========="
-    echo "Будут удалены Watchdog (Shell) и Web-интерфейс."
+    echo "Будут удалены Watchdog (Shell), Web-интерфейс и команда Podkop-w."
     echo ""
     printf "Вы уверены? [y/N]: "
     read answer
@@ -155,7 +155,8 @@ uninstall_all() {
     if [ -x "$SERVICE" ]; then
         "$SERVICE" disable >/dev/null 2>&1 || true
     fi
-    rm -f "$SERVICE" "$WATCHDOG" "$LOG" "$ROTATE"
+        rm -f /usr/bin/Podkop-w
+rm -f "$SERVICE" "$WATCHDOG" "$LOG" "$ROTATE"
     rm -f /etc/config/podkop_watchdog
     rm -f /usr/libexec/podkop-watchdog.sh
     rm -f /usr/libexec/rpcd/podkop-watchdog
@@ -163,7 +164,7 @@ uninstall_all() {
     rm -f /etc/rc.d/S99podkop-watchdog /etc/rc.d/K99podkop-watchdog 2>/dev/null || true
 
     echo ""
-    echo "✓ Watchdog Shell и Web-интерфейс полностью удалены."
+    echo "✓ Watchdog Shell, Web-интерфейс и команда Podkop-w полностью удалены."
 }
 
 
@@ -355,7 +356,7 @@ install_menu_command
 while true; do
     clear
     echo "=========================================="
-    echo "           Podkop Watchdog"
+    echo "     Xiaomi AX3000T — Podkop Watchdog"
     echo "=========================================="
     echo ""
 
