@@ -61,6 +61,62 @@ check_status() {
     logread | grep podkop-watchdog | tail -10
 }
 
+install_web() {
+    echo ""
+    echo "========== Установка / обновление Web =========="
+
+    if [ "$(id -u)" != "0" ]; then
+        echo "Ошибка: запустите скрипт от root."
+        return 1
+    fi
+
+    if ! command -v wget >/dev/null 2>&1; then
+        echo "Ошибка: требуется wget."
+        return 1
+    fi
+
+    TMP_WEB="/tmp/install-luci.sh"
+    echo -n "Загружаю установщик Web... "
+    if wget -q -O "$TMP_WEB" "$REPO_RAW/install-luci.sh"; then
+        chmod +x "$TMP_WEB"
+        echo "OK"
+        sh "$TMP_WEB"
+        rm -f "$TMP_WEB"
+    else
+        echo "ОШИБКА"
+        rm -f "$TMP_WEB"
+        return 1
+    fi
+}
+
+uninstall_web() {
+    echo ""
+    echo "========== Удаление Web =========="
+
+    if [ "$(id -u)" != "0" ]; then
+        echo "Ошибка: запустите скрипт от root."
+        return 1
+    fi
+
+    if ! command -v wget >/dev/null 2>&1; then
+        echo "Ошибка: требуется wget."
+        return 1
+    fi
+
+    TMP_WEB="/tmp/uninstall-luci.sh"
+    echo -n "Загружаю удаление Web... "
+    if wget -q -O "$TMP_WEB" "$REPO_RAW/uninstall-luci.sh"; then
+        chmod +x "$TMP_WEB"
+        echo "OK"
+        sh "$TMP_WEB"
+        rm -f "$TMP_WEB"
+    else
+        echo "ОШИБКА"
+        rm -f "$TMP_WEB"
+        return 1
+    fi
+}
+
 install_watchdog() {
     echo ""
     echo "========== Установка / обновление =========="
@@ -213,32 +269,10 @@ uninstall_watchdog() {
     esac
 }
 
-install_web() {
-    echo
-    echo "Установка / обновление Web-интерфейса..."
-    if [ -x "./install-luci.sh" ]; then
-        ./install-luci.sh
-    else
-        echo "Ошибка: install-luci.sh не найден."
-        return 1
-    fi
-}
-
-uninstall_web() {
-    echo
-    echo "Удаление Web-интерфейса..."
-    if [ -x "./uninstall-luci.sh" ]; then
-        ./uninstall-luci.sh
-    else
-        echo "Ошибка: uninstall-luci.sh не найден."
-        return 1
-    fi
-}
-
 while true; do
     clear
     echo "=========================================="
-    echo "              Podkop Watchdog"
+    echo "     Xiaomi AX3000T — Podkop Watchdog"
     echo "=========================================="
     echo ""
 
@@ -258,25 +292,38 @@ while true; do
     echo "  5) Изменить домен проверки"
     echo "  6) Показать лог"
     echo
-    echo "  --- Web-интерфейс luci---"
+    echo "  --- Web-интерфейс ---"
     echo "  7) Установить / обновить Web"
     echo "  8) Удалить Web"
     echo
     echo "  0) Выход"
-    echo
+    echo ""
     printf "Выберите действие [0-8]: "
     read choice
 
     case "$choice" in
         1) install_watchdog; pause ;;
-        2) status_watchdog; pause ;;
-        3) restart_watchdog; pause ;;
-        4) stop_watchdog; pause ;;
+        2) check_status; pause ;;
+        3)
+            "$SERVICE" restart >/dev/null 2>&1
+            sleep 1
+            if service_running; then
+                echo "✓ Watchdog перезапущен."
+            else
+                echo "⚠ Watchdog не запустился."
+            fi
+            pause
+            ;;
+        4)
+            "$SERVICE" stop >/dev/null 2>&1
+            echo "✓ Watchdog остановлен."
+            pause
+            ;;
         5) change_domain; pause ;;
         6) show_log; pause ;;
         7) install_web; pause ;;
         8) uninstall_web; pause ;;
-        0) exit 0 ;;
-        *) echo "Неверный выбор."; pause ;;
+        0|q|Q) exit 0 ;;
+        *) echo "Неверный выбор."; sleep 1 ;;
     esac
 done
