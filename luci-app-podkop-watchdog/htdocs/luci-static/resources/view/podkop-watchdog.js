@@ -72,39 +72,80 @@ return view.extend({
             ])
         ]);
 
+        var startButton, stopButton, restartButton;
+
+        function updateControls(st) {
+            st = st || {};
+            var running = st.running === true;
+            var statusEl = document.getElementById('podkop-watchdog-status');
+
+            if (statusEl) {
+                statusEl.textContent = running ? '● ЗАПУЩЕН' : '● ОСТАНОВЛЕН';
+                statusEl.style = running
+                    ? 'font-weight:700;color:#2e7d32;'
+                    : 'font-weight:700;color:#c62828;';
+            }
+
+            if (startButton)
+                startButton.disabled = running;
+            if (stopButton)
+                stopButton.disabled = !running;
+            if (restartButton)
+                restartButton.disabled = !running;
+        }
+
+        function refreshStatus() {
+            return callStatus().then(function(st) {
+                updateControls(st);
+                return st;
+            });
+        }
+
+        startButton = E('button', {
+            'type':'button',
+            'class':'cbi-button cbi-button-positive',
+            'click':ui.createHandlerFn(this,function() {
+                return callAction('start').then(function(reply) {
+                    if (reply && reply.ok === false)
+                        throw new Error(reply.error || _('Не удалось запустить Watchdog'));
+                    ui.addNotification(null,E('p',{},_('Watchdog запущен.')),'info');
+                    return refreshStatus();
+                });
+            })
+        }, _('Запустить'));
+
+        stopButton = E('button', {
+            'type':'button',
+            'class':'cbi-button cbi-button-negative',
+            'click':ui.createHandlerFn(this,function() {
+                return callAction('stop').then(function(reply) {
+                    if (reply && reply.ok === false)
+                        throw new Error(reply.error || _('Не удалось остановить Watchdog'));
+                    ui.addNotification(null,E('p',{},_('Watchdog остановлен.')),'info');
+                    return refreshStatus();
+                });
+            })
+        }, _('Остановить'));
+
+        restartButton = E('button', {
+            'type':'button',
+            'class':'cbi-button cbi-button-action',
+            'click':ui.createHandlerFn(this,function() {
+                return callAction('restart').then(function(reply) {
+                    if (reply && reply.ok === false)
+                        throw new Error(reply.error || _('Не удалось перезапустить Watchdog'));
+                    ui.addNotification(null,E('p',{},_('Watchdog перезапущен.')),'info');
+                    return refreshStatus();
+                });
+            })
+        }, _('Перезапустить'));
+
         var buttons = E('div', {
             'style':'display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px 0;padding:0;'
         }, [
-            E('button', {
-                'type':'button',
-                'class':'cbi-button cbi-button-positive',
-                'click':ui.createHandlerFn(this,function() {
-                    return callAction('start').then(function() {
-                        ui.addNotification(null,E('p',{},_('Watchdog запущен.')),'info');
-                        return callStatus();
-                    });
-                })
-            }, _('Запустить')),
-            E('button', {
-                'type':'button',
-                'class':'cbi-button cbi-button-negative',
-                'click':ui.createHandlerFn(this,function() {
-                    return callAction('stop').then(function() {
-                        ui.addNotification(null,E('p',{},_('Watchdog остановлен.')),'info');
-                        return callStatus();
-                    });
-                })
-            }, _('Остановить')),
-            E('button', {
-                'type':'button',
-                'class':'cbi-button cbi-button-action',
-                'click':ui.createHandlerFn(this,function() {
-                    return callAction('restart').then(function() {
-                        ui.addNotification(null,E('p',{},_('Watchdog перезапущен.')),'info');
-                        return callStatus();
-                    });
-                })
-            }, _('Перезапустить')),
+            startButton,
+            stopButton,
+            restartButton,
             E('button', {
                 'type':'button',
                 'class':'cbi-button',
@@ -118,6 +159,8 @@ return view.extend({
                 })
             }, _('Проверить'))
         ]);
+
+        updateControls(status);
 
         var settings = E('div', {
             'class':'cbi-section',
@@ -364,7 +407,7 @@ return view.extend({
                     return callAction(enabledNow ? 'restart' : 'stop');
                 }).then(function() {
                     ui.addNotification(null, E('p', {}, _('Настройки сохранены.')), 'info');
-                    return callStatus();
+                    return refreshStatus();
                 }).catch(function(err) {
                     ui.addNotification(null, E('p', {}, _('Ошибка сохранения: ') + String(err)), 'error');
                 });

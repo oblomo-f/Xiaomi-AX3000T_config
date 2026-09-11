@@ -3,7 +3,7 @@ include $(TOPDIR)/rules.mk
 LUCI_TITLE:=LuCI Support for Podkop Watchdog
 LUCI_DEPENDS:=+rpcd +luci-base
 PKG_NAME:=luci-app-podkop-watchdog
-PKG_VERSION:=9
+PKG_VERSION:=10
 PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/package.mk

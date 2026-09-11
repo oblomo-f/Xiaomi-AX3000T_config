@@ -32,34 +32,11 @@ status_json() {
 }
 
 get_action() {
-	# rpcd shell handlers normally receive the declared parameter as $3.
-	# Accept both a plain string ("check") and a JSON object for robustness.
-	if [ -n "$3" ]; then
-		case "$3" in
-			check|start|stop|restart|commit)
-				echo "$3"
-				return
-				;;
-			'{'*)
-				jsonfilter -s "$3" -e '@.action' 2>/dev/null
-				return
-				;;
-		esac
-	fi
+	# rpcd passes ubus method arguments to the plugin via stdin as JSON.
+	INPUT="$(cat)"
+	[ -n "$INPUT" ] || return 0
 
-	# Fallback for a JSON parameter in another argv position.
-	if [ -n "$4" ]; then
-		case "$4" in
-			check|start|stop|restart|commit)
-				echo "$4"
-				return
-				;;
-			'{'*)
-				jsonfilter -s "$4" -e '@.action' 2>/dev/null
-				return
-				;;
-		esac
-	fi
+	jsonfilter -s "$INPUT" -e '@.action' 2>/dev/null
 }
 
 case "$1" in
