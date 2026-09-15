@@ -51,16 +51,14 @@ check_url()
 $RESULT
 EOF_RESULT
 
-    if [ "$RET" -eq 0 ]; then
 
-        case "$CODE" in
-            2??|3??)
-                AVAILABLE=true
-                ;;
-            *)
-                AVAILABLE=false
-                ;;
-        esac
+if [ "$RET" -eq 0 ]; then
+
+    # Соединение с сервером состоялось.
+    # HTTP-код отдельно показывает результат обработки запроса.
+    AVAILABLE=true
+
+
 
         if [ -s "$TMP_BODY" ]; then
             CONTENT_OK=true
