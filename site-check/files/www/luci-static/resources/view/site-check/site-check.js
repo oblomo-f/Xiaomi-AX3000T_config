@@ -46,6 +46,12 @@ return view.extend({
             'font-size:18px;',
             '}',
 
+'.site-check-page .site-check-warning{',
+'color:#ef6c00;',
+'font-weight:700;',
+'font-size:18px;',
+'},',
+
             '.site-check-page .site-check-table{',
             'border-collapse:collapse;',
             'width:100%;',
@@ -204,16 +210,27 @@ return view.extend({
                 return;
             }
 
-            var available = data.available === true;
 
-            result.appendChild(E('div', {
-                'class': available
-                    ? 'site-check-success'
-                    : 'site-check-error'
-            }, available
-                ? '✓ САЙТ ДОСТУПЕН'
-                : '✗ САЙТ НЕДОСТУПЕН'
-            ));
+var available = data.available === true;
+var httpCode = parseInt(data.http_code, 10) || 0;
+
+var statusClass;
+var statusText;
+
+if (!available) {
+    statusClass = 'site-check-error';
+    statusText = '✗ САЙТ НЕДОСТУПЕН';
+} else if (httpCode >= 400 && httpCode <= 599) {
+    statusClass = 'site-check-warning';
+    statusText = '⚠ САЙТ ДОСТУПЕН — HTTP ' + httpCode;
+} else {
+    statusClass = 'site-check-success';
+    statusText = '✓ САЙТ ДОСТУПЕН';
+}
+
+result.appendChild(E('div', {
+    'class': statusClass
+}, statusText));
 
             var table = E('table', {
                 'class': 'site-check-table'
