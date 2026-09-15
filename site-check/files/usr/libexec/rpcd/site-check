@@ -1,0 +1,162 @@
+#!/bin/sh
+
+json_escape()
+{
+    printf '%s' "$1" | awk '{
+        gsub(/\\/, "\\\\");
+        gsub(/"/, "\\\"");
+        gsub(/\r/, "");
+        gsub(/\n/, "\\n");
+        printf "%s", $0
+    }'
+}
+
+check_url()
+{
+    URL="$1"
+
+    if [ -z "$URL" ]; then
+        echo '{"ok":false,"error":"URL не указан"}'
+        return
+    fi
+
+    URL="$(printf '%s' "$URL" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+    case "$URL" in
+        http://*|https://*)
+            ;;
+        *)
+            echo '{"ok":false,"error":"Разрешены только http:// и https://"}'
+            return
+            ;;
+    esac
+
+    TMP_BODY="/tmp/site-check-body.$$"
+    TMP_ERR="/tmp/site-check-error.$$"
+
+    RESULT=$(/usr/bin/curl \
+        -4 \
+        -L \
+        -sS \
+        -o "$TMP_BODY" \
+        -w '%{http_code}|%{time_total}|%{remote_ip}|%{url_effective}|%{size_download}|%{content_type}' \
+        --connect-timeout 10 \
+        --max-time 20 \
+        "$URL" 2>"$TMP_ERR")
+
+    RET=$?
+    ERROR="$(cat "$TMP_ERR" 2>/dev/null)"
+
+    IFS='|' read -r CODE TIME IP EFFECTIVE SIZE CONTENT_TYPE <<EOF_RESULT
+$RESULT
+EOF_RESULT
+
+    if [ "$RET" -eq 0 ]; then
+
+        case "$CODE" in
+            2??|3??)
+                AVAILABLE=true
+                ;;
+            *)
+                AVAILABLE=false
+                ;;
+        esac
+
+        if [ -s "$TMP_BODY" ]; then
+            CONTENT_OK=true
+        else
+            CONTENT_OK=false
+        fi
+
+        printf '{"ok":true,"available":%s,"dns":"ok","tcp":"ok","tls":"ok","http":"ok","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":0}\n' \
+            "$AVAILABLE" \
+            "${CODE:-0}" \
+            "${TIME:-0}" \
+            "$(json_escape "$IP")" \
+            "$(json_escape "$EFFECTIVE")" \
+            "${SIZE:-0}" \
+            "$(json_escape "$CONTENT_TYPE")" \
+            "$CONTENT_OK"
+
+        rm -f "$TMP_BODY" "$TMP_ERR"
+        return
+    fi
+
+    case "$RET" in
+        6)
+            DNS_STATUS="error"
+            TCP_STATUS="not_tested"
+            TLS_STATUS="not_tested"
+            HTTP_STATUS="not_tested"
+            STAGE="DNS"
+            ;;
+
+        7|28)
+            DNS_STATUS="ok"
+            TCP_STATUS="error"
+            TLS_STATUS="not_tested"
+            HTTP_STATUS="not_tested"
+            STAGE="TCP"
+            ;;
+
+        35|51|53|54|55|58|59|60|64|66|77)
+            DNS_STATUS="ok"
+            TCP_STATUS="ok"
+            TLS_STATUS="error"
+            HTTP_STATUS="not_tested"
+            STAGE="TLS"
+            ;;
+
+        *)
+            DNS_STATUS="ok"
+            TCP_STATUS="ok"
+            TLS_STATUS="ok"
+            HTTP_STATUS="error"
+            STAGE="HTTP"
+            ;;
+    esac
+
+    ERROR="$(json_escape "$ERROR")"
+
+    printf '{"ok":true,"available":false,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"","content_ok":false,"curl_code":%s,"stage":"%s","error":"%s"}\n' \
+        "$DNS_STATUS" \
+        "$TCP_STATUS" \
+        "$TLS_STATUS" \
+        "$HTTP_STATUS" \
+        "${CODE:-0}" \
+        "${TIME:-0}" \
+        "$(json_escape "$IP")" \
+        "$(json_escape "$EFFECTIVE")" \
+        "${SIZE:-0}" \
+        "$RET" \
+        "$STAGE" \
+        "$ERROR"
+
+    rm -f "$TMP_BODY" "$TMP_ERR"
+}
+
+case "$1" in
+
+    list)
+        echo '{"check":{"url":"String"}}'
+        ;;
+
+    call)
+
+        case "$2" in
+
+            check)
+                INPUT="$(cat)"
+                URL="$(jsonfilter -s "$INPUT" -e '@.url' 2>/dev/null)"
+                check_url "$URL"
+                ;;
+
+            *)
+                echo '{"ok":false,"error":"unknown method"}'
+                ;;
+
+        esac
+
+        ;;
+
+esac

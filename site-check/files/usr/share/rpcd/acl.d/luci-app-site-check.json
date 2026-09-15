@@ -1,0 +1,12 @@
+{
+    "luci-app-site-check": {
+        "description": "Site Checker",
+        "read": {
+            "ubus": {
+                "site-check": [
+                    "check"
+                ]
+            }
+        }
+    }
+}
