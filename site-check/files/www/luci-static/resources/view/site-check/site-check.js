@@ -119,6 +119,8 @@ return view.extend({
             'padding:0 10px;',
             'border-bottom:1px solid #ddd;',
             'vertical-align:middle;',
+            'white-space:nowrap;',
+            'width:100%;',
             '}',
 
             '.site-check-page .site-check-error{',
