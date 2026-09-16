@@ -108,6 +108,19 @@ return view.extend({
             'font-size:18px;',
             '}',
 
+            '.site-check-page .site-check-status{',
+            'height:22px;',
+            'line-height:22px;',
+            'margin:0;',
+            'visibility:hidden;',
+            '}',
+            '.site-check-page .site-check-status-cell{',
+            'height:36px;',
+            'padding:0 10px;',
+            'border-bottom:1px solid #ddd;',
+            'vertical-align:middle;',
+            '}',
+
             '.site-check-page .site-check-error{',
             'color:#c62828;',
             'font-weight:700;',
@@ -478,176 +491,213 @@ table.appendChild(E('tr', {}, [
             'class': 'cbi-button cbi-button-action site-check-button'
         }, 'ПРОВЕРИТЬ');
 
-        function renderStageResult(data) {
-            result.style.display = '';
+        var stageStatus = {};
+        var resultStatus = E('div', {
+            'class': 'site-check-status site-check-success',
+            'style': 'display:block;visibility:hidden;'
+        });
 
+        var stageCells = {};
+        var routeCell;
+        var contentCell;
+        var dataCells = {};
+        var resultTable;
+        var routeDetected = false;
+        var finalDetailsQueued = false;
+        var routeCheckEnabled = false;
+
+        function setStageCell(cell, value) {
+            cell.innerHTML = '';
+
+            if (value === 'ok') {
+                cell.appendChild(E('span', {
+                    'class': 'site-check-ok'
+                }, '✓ OK'));
+            } else if (value === 'error') {
+                cell.appendChild(E('span', {
+                    'class': 'site-check-fail'
+                }, '✗ ОШИБКА'));
+            }
+        }
+
+        function resetResultTable() {
+            resultStatus.style.display = 'block';
+            resultStatus.style.visibility = 'hidden';
+            resultStatus.textContent = '';
+
+            [ 'dns', 'tcp', 'tls', 'http' ].forEach(function(key) {
+                setStageCell(stageCells[key], '');
+            });
+
+            routeCell.textContent = '';
+            contentCell.textContent = '';
+            dataCells.ip.textContent = '';
+            routeDetected = false;
+            finalDetailsQueued = false;
+            dataCells.time.textContent = '';
+            dataCells.size.textContent = '';
+            dataCells.content_type.textContent = '';
+            dataCells.url.textContent = '';
+        }
+
+        function renderStageResult(data) {
             if (!data)
                 data = {};
 
-            result.innerHTML = '';
+            [ 'dns', 'tcp', 'tls', 'http' ].forEach(function(key) {
+                if (data[key] === 'ok' || data[key] === 'error')
+                    setStageCell(stageCells[key], data[key]);
+            });
 
-            var available = data.available === true;
-            var httpCode = parseInt(data.http_code, 10) || 0;
+            /*
+             * Route is a separate stage after HTTP.
+             * It is shown once and never blocks the final data stage.
+             */
+            if (data.http === 'ok' && !routeDetected) {
+                var routeText = data.route;
 
-            if (data.final === true || data.ok === false) {
-                var statusClass;
-                var statusText;
-
-                if (data.ok === false || data.state === 'error') {
-                    statusClass = 'site-check-error';
-                    statusText = '✗ ОШИБКА ПРОВЕРКИ';
-                } else if (!available) {
-                    statusClass = 'site-check-error';
-                    statusText = '✗ САЙТ НЕДОСТУПЕН';
-                } else if (httpCode >= 400 && httpCode <= 599) {
-                    statusClass = 'site-check-warning';
-                    statusText = '⚠ САЙТ ДОСТУПЕН — HTTP ' + httpCode;
+                if (!routeCheckEnabled) {
+                    routeText = 'Не определялся';
+                } else if (routeText === 'zapret') {
+                    routeText = 'Zapret';
+                } else if (routeText === 'podkop') {
+                    routeText = 'Podkop';
+                } else if (routeText === 'podkop+zapret') {
+                    routeText = 'Podkop + Zapret';
+                } else if (routeText === 'direct') {
+                    routeText = 'Напрямую';
+                } else if (!routeText || routeText === 'not_checked') {
+                    /* Wait for the final route value when route detection is enabled. */
+                    if (routeCheckEnabled && data.final !== true)
+                        routeText = null;
+                    else
+                        routeText = 'Не определён';
                 } else {
-                    statusClass = 'site-check-success';
-                    statusText = '✓ САЙТ ДОСТУПЕН';
+                    routeText = 'Не определён';
                 }
 
-                result.appendChild(E('div', {
-                    'class': statusClass
-                }, statusText));
+                if (routeText !== null) {
+                    routeDetected = true;
+                    routeCell.innerHTML = '';
+                    routeCell.appendChild(E('span', {
+                        'class': routeText === 'Не определялся' ? '' : 'site-check-ok'
+                    }, routeText));
+                }
             }
 
-            var table = E('table', {
-                'class': 'site-check-table'
-            });
-
-            function stageCell(value) {
-                if (value === 'ok')
-                    return E('td', {}, E('span', {
-                        'class': 'site-check-ok'
-                    }, '✓ OK'));
-
-                if (value === 'error')
-                    return E('td', {}, E('span', {
-                        'class': 'site-check-fail'
-                    }, '✗ ОШИБКА'));
-
-                return E('td', {}, '');
-            }
-
-            [ 'DNS', 'TCP', 'TLS', 'HTTP' ].forEach(function(stage) {
-                var key = stage.toLowerCase();
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, stage),
-                    stageCell(data[key])
-                ]));
-            });
-
-            var routeText = '';
-            if (data.route && data.route !== 'not_checked') {
-                if (data.route === 'zapret')
-                    routeText = 'Zapret';
-                else if (data.route === 'podkop')
-                    routeText = 'Podkop';
-                else if (data.route === 'podkop+zapret')
-                    routeText = 'Podkop + Zapret';
-                else if (data.route === 'direct')
-                    routeText = 'Напрямую';
-                else
-                    routeText = 'Не определён';
-            }
-
-            table.appendChild(E('tr', {}, [
-                E('td', {}, 'Маршрут через'),
-                E('td', {}, routeText
-                    ? E('span', {
-                        'class': 'site-check-ok'
-                    }, routeText)
-                    : '')
-            ]));
-
-            table.appendChild(E('tr', {}, [
-                E('td', {}, 'Содержимое'),
-                E('td', {}, data.content_ok === true
-                    ? E('span', {
-                        'class': 'site-check-ok'
-                    }, '✓ Получено')
-                    : (data.final === true && data.http === 'ok'
-                        ? E('span', {
+            /*
+             * Final response data is independent from route rendering.
+             * This fixes the case where route was rendered on the HTTP poll
+             * and later final=true could no longer render content/data.
+             */
+            if (data.final === true) {
+                window.setTimeout(function() {
+                    if (data.content_ok === true) {
+                        contentCell.innerHTML = '';
+                        contentCell.appendChild(E('span', {
+                            'class': 'site-check-ok'
+                        }, '✓ Получено'));
+                    } else {
+                        contentCell.innerHTML = '';
+                        contentCell.appendChild(E('span', {
                             'class': 'site-check-fail'
-                        }, '✗ Не получено')
-                        : ''))
-            ]));
+                        }, '✗ Не получено'));
+                    }
 
-            table.appendChild(E('tr', {}, [
-                E('td', {}, 'IP-адрес'),
-                E('td', {}, data.ip || '')
-            ]));
+                    window.setTimeout(function() {
+                        if (data.ip)
+                            dataCells.ip.textContent = data.ip;
+                        if (data.time)
+                            dataCells.time.textContent = data.time + ' сек.';
+                        if (data.size)
+                            dataCells.size.textContent = data.size + ' байт';
+                        if (data.content_type)
+                            dataCells.content_type.textContent = data.content_type;
+                        if (data.url)
+                            dataCells.url.textContent = data.url;
 
-            table.appendChild(E('tr', {}, [
-                E('td', {}, 'Время ответа'),
-                E('td', {}, data.time
-                    ? data.time + ' сек.'
-                    : '')
-            ]));
+                        /*
+                         * The status is the first, separate table cell,
+                         * but it appears only after the final URL has been
+                         * rendered. This keeps the visual sequence stable.
+                         */
+                        var statusClass;
+                        var statusText;
 
-            table.appendChild(E('tr', {}, [
-                E('td', {}, 'Получено'),
-                E('td', {}, data.size
-                    ? data.size + ' байт'
-                    : '')
-            ]));
+                        if (data.ok === false || data.state === 'error') {
+                            statusClass = 'site-check-error';
+                            statusText = '✗ ОШИБКА ПРОВЕРКИ';
+                        } else if (data.available !== true) {
+                            statusClass = 'site-check-error';
+                            statusText = '✗ САЙТ НЕДОСТУПЕН';
+                        } else {
+                            var httpCode = parseInt(data.http_code, 10) || 0;
+                            if (httpCode >= 400 && httpCode <= 599) {
+                                statusClass = 'site-check-warning';
+                                statusText = '⚠ САЙТ ДОСТУПЕН — HTTP ' + httpCode;
+                            } else {
+                                statusClass = 'site-check-success';
+                                statusText = '✓ САЙТ ДОСТУПЕН';
+                            }
+                        }
 
-            table.appendChild(E('tr', {}, [
-                E('td', {}, 'Тип содержимого'),
-                E('td', {}, data.content_type || '')
-            ]));
+                        resultStatus.className = statusClass;
+                        resultStatus.textContent = statusText;
+                        resultStatus.style.display = 'block';
+                        resultStatus.style.visibility = 'visible';
+                    }, 180);
+                }, 180);
+            }
 
-            table.appendChild(E('tr', {}, [
-                E('td', {}, 'Итоговый URL'),
-                E('td', {}, data.url || '')
-            ]));
-
-            result.appendChild(table);
-
-            if (data.error) {
-                result.appendChild(E('div', {
-                    'style': 'margin-top:15px;font-weight:700;'
-                }, 'Ошибка:'));
-
-                result.appendChild(E('div', {
-                    'class': 'site-check-error-box'
-                }, data.error));
+            if (data.content_ok === true && data.http !== 'ok') {
+                contentCell.innerHTML = '';
+                contentCell.appendChild(E('span', {
+                    'class': 'site-check-ok'
+                }, '✓ Получено'));
             }
         }
 
         function renderEmptyResult() {
-            result.style.display = '';
-
             result.innerHTML = '';
 
-            var table = E('table', {
+            resultStatus.style.display = 'block';
+            resultStatus.style.visibility = 'hidden';
+
+            resultTable = E('table', {
                 'class': 'site-check-table'
             });
 
-            [
-                'DNS',
-                'TCP',
-                'TLS',
-                'HTTP',
-                'Маршрут через',
-                'Содержимое',
-                'IP-адрес',
-                'Время ответа',
-                'Получено',
-                'Тип содержимого',
-                'Итоговый URL'
-            ].forEach(function(label) {
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, label),
-                    E('td', {}, '')
-                ]));
+            var statusCell = E('td', {
+                'class': 'site-check-status-cell',
+                'colspan': '2'
             });
+            statusCell.appendChild(resultStatus);
+            resultTable.appendChild(E('tr', {}, [ statusCell ]));
 
-            result.appendChild(table);
+            function addRow(key, label) {
+                var valueCell = E('td', {});
+                resultTable.appendChild(E('tr', {}, [
+                    E('td', {}, label),
+                    valueCell
+                ]));
+                return valueCell;
+            }
+
+            stageCells.dns = addRow('dns', 'DNS');
+            stageCells.tcp = addRow('tcp', 'TCP');
+            stageCells.tls = addRow('tls', 'TLS');
+            stageCells.http = addRow('http', 'HTTP');
+            routeCell = addRow('route', 'Маршрут через');
+            contentCell = addRow('content', 'Содержимое');
+            dataCells.ip = addRow('ip', 'IP-адрес');
+            dataCells.time = addRow('time', 'Время ответа');
+            dataCells.size = addRow('size', 'Получено');
+            dataCells.content_type = addRow('content_type', 'Тип содержимого');
+            dataCells.url = addRow('url', 'Итоговый URL');
+
+            result.appendChild(resultTable);
+            resetResultTable();
         }
-
-        renderEmptyResult();
 
         function pollStageCheck(id) {
             callStatus(id).then(function(data) {
@@ -691,9 +741,10 @@ table.appendChild(E('tr', {}, [
             checkButton.disabled = true;
             checkButton.textContent = 'ПРОВЕРКА...';
             result.style.display = '';
-            result.innerHTML = '';
+            resetResultTable();
+            routeCheckEnabled = routeCheckbox.checked;
 
-            callStart(url, routeCheckbox.checked).then(function(data) {
+            callStart(url, routeCheckEnabled).then(function(data) {
 
                 if (!data || !data.id) {
                     throw new Error('Не удалось запустить проверку');
@@ -981,6 +1032,12 @@ var multiInput = E('textarea', {
 
             });
         });
+
+        /*
+         * Сразу создаём пустую таблицу одиночной проверки.
+         * Она существует уже при загрузке страницы и больше не пересоздаётся.
+         */
+        renderEmptyResult();
 
         /*
          * СТРАНИЦА
