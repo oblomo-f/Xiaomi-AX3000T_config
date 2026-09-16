@@ -129,6 +129,234 @@ detect_route()
     return 0
 }
 
+write_job()
+{
+    ID="$1"
+    shift
+    FILE="/tmp/site-check-job-$ID.json"
+    TMP="${FILE}.tmp"
+
+    printf '%s\n' "$*" > "$TMP"
+    mv "$TMP" "$FILE"
+}
+
+run_job()
+{
+    ID="$1"
+    URL="$2"
+    DETECT_ROUTE="$3"
+
+    JOB="/tmp/site-check-job-$ID.json"
+    BODY="/tmp/site-check-body-$ID"
+    OUT="/tmp/site-check-curl-$ID.out"
+    ERR="/tmp/site-check-curl-$ID.err"
+
+    rm -f "$BODY" "$OUT" "$ERR"
+
+    # The network check itself is performed once by curl.
+    /usr/bin/curl \
+        -4 \
+        -L \
+        -sS \
+        -o "$BODY" \
+        -w '%{http_code}|%{time_total}|%{remote_ip}|%{url_effective}|%{size_download}|%{content_type}' \
+        --connect-timeout 10 \
+        --max-time 20 \
+        "$URL" >"$OUT" 2>"$ERR" &
+    CURL_PID=$!
+
+    # Wait for curl to finish. The diagnostic lines below are then
+    # deliberately published one by one so LuCI can display them separately.
+    wait "$CURL_PID"
+    CURL_RET=$?
+
+    CURL_OUTPUT="$(cat "$OUT" 2>/dev/null)"
+    HTTP_CODE="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f1)"
+    TIME_TOTAL="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f2)"
+    REMOTE_IP="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f3)"
+    URL_EFFECTIVE="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f4)"
+    SIZE_DOWNLOAD="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f5)"
+    CONTENT_TYPE="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f6-)"
+    CURL_ERR="$(cat "$ERR" 2>/dev/null)"
+
+    DNS="ok"
+    TCP="ok"
+    TLS="ok"
+    HTTP="ok"
+    AVAILABLE=true
+
+    case "$CURL_RET" in
+        6)
+            DNS="error"; TCP="pending"; TLS="pending"; HTTP="pending"; AVAILABLE=false ;;
+        7|28)
+            DNS="ok"; TCP="error"; TLS="pending"; HTTP="pending"; AVAILABLE=false ;;
+        35|51|53|60|66|77)
+            DNS="ok"; TCP="ok"; TLS="error"; HTTP="pending"; AVAILABLE=false ;;
+        0)
+            DNS="ok"; TCP="ok"; TLS="ok"; HTTP="ok" ;;
+        *)
+            DNS="ok"; TCP="ok"; TLS="ok"; HTTP="error"; AVAILABLE=false ;;
+    esac
+
+    if [ "$CURL_RET" -eq 0 ] || { [ -n "$HTTP_CODE" ] && [ "$HTTP_CODE" != "000" ]; }; then
+        DNS="ok"
+        TCP="ok"
+        TLS="ok"
+        HTTP="ok"
+        AVAILABLE=true
+    fi
+
+    if [ -s "$BODY" ]; then
+        CONTENT_OK=true
+    else
+        CONTENT_OK=false
+    fi
+
+    # Publish only the stages that were actually reached.
+    if [ "$DNS" = "ok" ]; then
+        write_job "$ID" '{"state":"running","dns":"ok","tcp":"pending","tls":"pending","http":"pending","route":"not_checked","final":false}'
+        sleep 0.8
+    else
+        write_job "$ID" '{"state":"running","dns":"error","tcp":"pending","tls":"pending","http":"pending","route":"not_checked","final":false}'
+        sleep 0.8
+    fi
+
+    if [ "$TCP" = "ok" ]; then
+        write_job "$ID" '{"state":"running","dns":"ok","tcp":"ok","tls":"pending","http":"pending","route":"not_checked","final":false}'
+        sleep 0.8
+    elif [ "$TCP" = "error" ]; then
+        write_job "$ID" '{"state":"running","dns":"ok","tcp":"error","tls":"pending","http":"pending","route":"not_checked","final":false}'
+        sleep 0.8
+        rm -f "$BODY" "$OUT" "$ERR"
+        return 0
+    fi
+
+    if [ "$TLS" = "ok" ]; then
+        write_job "$ID" '{"state":"running","dns":"ok","tcp":"ok","tls":"ok","http":"pending","route":"not_checked","final":false}'
+        sleep 0.8
+    elif [ "$TLS" = "error" ]; then
+        write_job "$ID" '{"state":"running","dns":"ok","tcp":"ok","tls":"error","http":"pending","route":"not_checked","final":false}'
+        sleep 0.8
+        rm -f "$BODY" "$OUT" "$ERR"
+        return 0
+    fi
+
+    if [ "$HTTP" = "ok" ]; then
+        write_job "$ID" '{"state":"running","dns":"ok","tcp":"ok","tls":"ok","http":"ok","route":"not_checked","final":false}'
+        sleep 0.8
+    else
+        write_job "$ID" '{"state":"running","dns":"ok","tcp":"ok","tls":"ok","http":"error","route":"not_checked","final":false}'
+        sleep 0.8
+        rm -f "$BODY" "$OUT" "$ERR"
+        return 0
+    fi
+
+    ROUTE="not_checked"
+    if [ "$DETECT_ROUTE" = "true" ] || [ "$DETECT_ROUTE" = "1" ]; then
+        ROUTE="$(detect_route "$URL")"
+    fi
+
+    # Final result: route is shown immediately after HTTP, followed by
+    # content and the remaining response information.
+    printf '{"state":"done","final":true,"ok":true,"available":%s,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":%s,"route":"%s"}\n' \
+        "$AVAILABLE" "$DNS" "$TCP" "$TLS" "$HTTP" \
+        "${HTTP_CODE:-0}" \
+        "$(json_escape "${TIME_TOTAL:-0}")" \
+        "$(json_escape "${REMOTE_IP:-}")" \
+        "$(json_escape "${URL_EFFECTIVE:-$URL}")" \
+        "${SIZE_DOWNLOAD:-0}" \
+        "$(json_escape "${CONTENT_TYPE:-}")" \
+        "$CONTENT_OK" "$CURL_RET" \
+        "$(json_escape "${ROUTE:-not_checked}")" > "${JOB}.tmp"
+
+    mv "${JOB}.tmp" "$JOB"
+
+    rm -f "$BODY" "$OUT" "$ERR"
+
+    # Keep final JSON briefly for the last LuCI poll, then remove it.
+    (
+        sleep 10
+        rm -f "$JOB"
+    ) >/dev/null 2>&1 &
+}
+
+cleanup_old_jobs()
+{
+    NOW="$(date +%s)"
+
+    for JOB in /tmp/site-check-job-*.json; do
+        [ -f "$JOB" ] || continue
+
+        MTIME="$(stat -c %Y "$JOB" 2>/dev/null)"
+        [ -n "$MTIME" ] || continue
+
+        AGE=$((NOW - MTIME))
+
+        # Keep a finished result briefly so the last LuCI status request
+        # can read it, then remove it.
+        if [ "$AGE" -gt 10 ]; then
+            rm -f "$JOB"
+        fi
+    done
+}
+
+start_check()
+{
+    URL="$1"
+    DETECT_ROUTE="$2"
+
+    if [ -z "$URL" ]; then
+        echo '{"ok":false,"error":"URL не указан"}'
+        return
+    fi
+
+    URL="$(printf '%s' "$URL" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+    case "$URL" in
+        http://*|https://*) ;;
+        *)
+            echo '{"ok":false,"error":"URL должен начинаться с http:// или https://"}'
+            return
+            ;;
+    esac
+
+    cleanup_old_jobs
+
+    ID="$$-$(date +%s)-$RANDOM"
+    ID="$(printf '%s' "$ID" | tr -cd 'A-Za-z0-9_-')"
+
+    JOB="/tmp/site-check-job-$ID.json"
+
+    # Create the job immediately. This prevents the first LuCI status
+    # request from seeing "Проверка не найдена".
+    printf '%s\n' '{"state":"running","final":false,"ok":true,"available":false,"dns":"pending","tcp":"pending","tls":"pending","http":"pending","route":"not_checked"}' > "$JOB"
+
+    run_job "$ID" "$URL" "$DETECT_ROUTE" >/dev/null 2>&1 &
+
+    echo "{\"ok\":true,\"id\":\"$ID\"}"
+}
+
+status_check()
+{
+    ID="$1"
+
+    case "$ID" in
+        ''|*[!A-Za-z0-9_-]*)
+            echo '{"ok":false,"error":"Неверный идентификатор проверки"}'
+            return
+            ;;
+    esac
+
+    JOB="/tmp/site-check-job-$ID.json"
+
+    if [ ! -f "$JOB" ]; then
+        echo '{"ok":false,"state":"error","error":"Проверка не найдена"}'
+        return
+    fi
+
+    cat "$JOB"
+}
+
 check_url()
 {
     URL="$1"
@@ -165,9 +393,6 @@ check_url()
             "$URL" 2>"$CURL_ERR_FILE"
     )"
     CURL_RET=$?
-
-    CURL_ERR="$(cat "$CURL_ERR_FILE" 2>/dev/null)"
-    rm -f "$CURL_ERR_FILE"
 
     HTTP_CODE="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f1)"
     TIME_TOTAL="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f2)"
@@ -211,7 +436,7 @@ check_url()
         ROUTE="not_checked"
     fi
 
-    rm -f "$BODY_FILE"
+    rm -f "$BODY_FILE" "$CURL_ERR_FILE"
 
     printf '{"ok":true,"available":%s,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":%s,"route":"%s"}\n' \
         "$AVAILABLE" "$DNS" "$TCP" "$TLS" "$HTTP" \
@@ -227,10 +452,21 @@ check_url()
 
 case "$1" in
     list)
-        echo '{"check":{"url":"String","route":"Boolean"}}'
+        echo '{"start":{"url":"String","route":"Boolean"},"status":{"id":"String"},"check":{"url":"String","route":"Boolean"}}'
         ;;
     call)
         case "$2" in
+            start)
+                INPUT="$(cat)"
+                URL="$(printf '%s' "$INPUT" | jsonfilter -e '@.url' 2>/dev/null)"
+                DETECT_ROUTE="$(printf '%s' "$INPUT" | jsonfilter -e '@.route' 2>/dev/null)"
+                start_check "$URL" "$DETECT_ROUTE"
+                ;;
+            status)
+                INPUT="$(cat)"
+                ID="$(printf '%s' "$INPUT" | jsonfilter -e '@.id' 2>/dev/null)"
+                status_check "$ID"
+                ;;
             check)
                 INPUT="$(cat)"
                 URL="$(printf '%s' "$INPUT" | jsonfilter -e '@.url' 2>/dev/null)"

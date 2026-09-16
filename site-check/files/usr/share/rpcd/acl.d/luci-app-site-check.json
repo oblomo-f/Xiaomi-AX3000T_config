@@ -1,10 +1,12 @@
 {
     "luci-app-site-check": {
-        "description": "Site Checker",
+        "description": "Проверка сайтов",
         "read": {
             "ubus": {
                 "site-check": [
-                    "check"
+                    "check",
+                    "start",
+                    "status"
                 ]
             }
         }

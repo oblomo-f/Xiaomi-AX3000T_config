@@ -10,6 +10,20 @@ var callCheck = rpc.declare({
     expect: {}
 });
 
+var callStart = rpc.declare({
+    object: 'site-check',
+    method: 'start',
+    params: [ 'url', 'route' ],
+    expect: {}
+});
+
+var callStatus = rpc.declare({
+    object: 'site-check',
+    method: 'status',
+    params: [ 'id' ],
+    expect: {}
+});
+
 return view.extend({
 
     render: function() {
@@ -368,6 +382,196 @@ table.appendChild(E('tr', {}, [
             'class': 'cbi-button cbi-button-action site-check-button'
         }, 'ПРОВЕРИТЬ');
 
+        function renderStageResult(data) {
+            result.style.display = '';
+            result.innerHTML = '';
+
+            if (!data)
+                return;
+
+            if (data.error && data.state === 'error') {
+                result.appendChild(E('div', {
+                    'class': 'site-check-error'
+                }, '✗ ОШИБКА ПРОВЕРКИ'));
+
+                result.appendChild(E('div', {
+                    'class': 'site-check-error-box'
+                }, data.error));
+
+                var errorTable = E('table', {
+                    'class': 'site-check-table'
+                });
+
+                [ 'dns', 'tcp', 'tls', 'http' ].forEach(function(stage) {
+                    if (data[stage] === 'ok' || data[stage] === 'error') {
+                        errorTable.appendChild(E('tr', {}, [
+                            E('td', {}, stage.toUpperCase()),
+                            E('td', {}, stageText(data[stage]))
+                        ]));
+                    }
+                });
+
+                result.appendChild(errorTable);
+                return;
+            }
+
+            var table = E('table', {
+                'class': 'site-check-table'
+            });
+
+            if (data.dns === 'ok') {
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'DNS'),
+                    E('td', {}, E('span', {
+                        'class': 'site-check-ok'
+                    }, '✓ OK'))
+                ]));
+            }
+
+            if (data.tcp === 'ok' || data.tcp === 'error') {
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'TCP'),
+                    E('td', {}, stageText(data.tcp))
+                ]));
+            }
+
+            if (data.tls === 'ok' || data.tls === 'error') {
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'TLS'),
+                    E('td', {}, stageText(data.tls))
+                ]));
+            }
+
+            if (data.http === 'ok' || data.http === 'error') {
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'HTTP'),
+                    E('td', {}, data.http === 'ok'
+                        ? E('span', {
+                            'class': 'site-check-ok'
+                        }, '✓ OK')
+                        : stageText(data.http))
+                ]));
+            }
+
+            if (data.http === 'ok' && data.route && data.route !== 'not_checked') {
+                var routeText = data.route;
+
+                if (routeText === 'zapret')
+                    routeText = 'Zapret';
+                else if (routeText === 'podkop')
+                    routeText = 'Podkop';
+                else if (routeText === 'podkop+zapret')
+                    routeText = 'Podkop + Zapret';
+                else if (routeText === 'direct')
+                    routeText = 'Напрямую';
+                else
+                    routeText = 'Не определён';
+
+                var routeClass = data.route === 'direct' || data.route === 'unknown'
+                    ? 'site-check-na'
+                    : 'site-check-ok';
+
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'Маршрут через'),
+                    E('td', {}, E('span', {
+                        'class': routeClass
+                    }, routeText))
+                ]));
+            }
+
+            if (data.http === 'ok' && data.final === true) {
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'Содержимое'),
+                    E('td', {}, data.content_ok === true
+                        ? E('span', {
+                            'class': 'site-check-ok'
+                        }, '✓ Получено')
+                        : E('span', {
+                            'class': 'site-check-fail'
+                        }, '✗ Не получено')
+                    )
+                ]));
+
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'IP-адрес'),
+                    E('td', {}, data.ip || '—')
+                ]));
+
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'Время ответа'),
+                    E('td', {}, data.time
+                        ? data.time + ' сек.'
+                        : '—')
+                ]));
+
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'Получено'),
+                    E('td', {}, data.size
+                        ? data.size + ' байт'
+                        : '—')
+                ]));
+
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'Тип содержимого'),
+                    E('td', {}, data.content_type || '—')
+                ]));
+
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'Итоговый URL'),
+                    E('td', {}, data.url || '—')
+                ]));
+            }
+
+            result.appendChild(table);
+
+            if (data.final === true) {
+                var available = data.available === true;
+                var httpCode = parseInt(data.http_code, 10) || 0;
+                var statusClass;
+                var statusText;
+
+                if (!available) {
+                    statusClass = 'site-check-error';
+                    statusText = '✗ САЙТ НЕДОСТУПЕН';
+                } else if (httpCode >= 400 && httpCode <= 599) {
+                    statusClass = 'site-check-warning';
+                    statusText = '⚠ САЙТ ДОСТУПЕН — HTTP ' + httpCode;
+                } else {
+                    statusClass = 'site-check-success';
+                    statusText = '✓ САЙТ ДОСТУПЕН';
+                }
+
+                result.insertBefore(E('div', {
+                    'class': statusClass
+                }, statusText), result.firstChild);
+            }
+        }
+
+        function pollStageCheck(id) {
+            callStatus(id).then(function(data) {
+                renderStageResult(data);
+
+                if (data.state === 'running') {
+                    window.setTimeout(function() {
+                        pollStageCheck(id);
+                    }, 250);
+                    return;
+                }
+
+                checkButton.disabled = false;
+                checkButton.textContent = 'ПРОВЕРИТЬ';
+
+            }).catch(function(error) {
+                renderStageResult({
+                    state: 'error',
+                    error: error.message || 'Ошибка RPC'
+                });
+
+                checkButton.disabled = false;
+                checkButton.textContent = 'ПРОВЕРИТЬ';
+            });
+        }
+
         checkButton.addEventListener('click', function() {
 
             var url = input.value.trim();
@@ -384,24 +588,26 @@ table.appendChild(E('tr', {}, [
 
             checkButton.disabled = true;
             checkButton.textContent = 'ПРОВЕРКА...';
-            result.style.display = 'none';
+            result.style.display = '';
+            result.innerHTML = '';
 
-            callCheck(url, routeCheckbox.checked).then(function(data) {
+            callStart(url, routeCheckbox.checked).then(function(data) {
 
-                showResult(data);
+                if (!data || !data.id) {
+                    throw new Error('Не удалось запустить проверку');
+                }
+
+                pollStageCheck(data.id);
 
             }).catch(function(error) {
 
-
-                showResult({
-                    ok: false,
+                renderStageResult({
+                    state: 'error',
                     error: error.message || 'Ошибка RPC'
                 });
 
-            }).finally(function() {
                 checkButton.disabled = false;
                 checkButton.textContent = 'ПРОВЕРИТЬ';
-
             });
         });
 
@@ -608,7 +814,7 @@ var multiInput = E('textarea', {
 
                     tbody.appendChild(row);
 
-                    return callCheck(url).then(function(data) {
+                    return callCheck(url, false).then(function(data) {
 
                         var available = data &&
                             data.ok === true &&
