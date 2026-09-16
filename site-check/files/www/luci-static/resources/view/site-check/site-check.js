@@ -61,12 +61,13 @@ return view.extend({
             'display:flex;',
             'gap:10px;',
             'align-items:stretch;',
-            'max-width:900px;',
+            'max-width:1000px;',
             'margin-top:20px;',
             '}',
             '.site-check-page .site-check-top .site-check-result{',
             'margin-top:0;',
-            'flex:1;',
+            'flex:1 1 auto;',
+            'min-width:0;',
             'max-width:none;',
             '}',
             '.site-check-page .site-check-system-info{',
@@ -252,7 +253,7 @@ return view.extend({
 
         var result = E('div', {
             'class': 'site-check-result',
-            'style': 'display:none;'
+            'style': 'display:block;'
         });
 
         function stageText(value) {
@@ -485,13 +486,35 @@ table.appendChild(E('tr', {}, [
 
             result.innerHTML = '';
 
+            var available = data.available === true;
+            var httpCode = parseInt(data.http_code, 10) || 0;
+
+            if (data.final === true || data.ok === false) {
+                var statusClass;
+                var statusText;
+
+                if (data.ok === false || data.state === 'error') {
+                    statusClass = 'site-check-error';
+                    statusText = '✗ ОШИБКА ПРОВЕРКИ';
+                } else if (!available) {
+                    statusClass = 'site-check-error';
+                    statusText = '✗ САЙТ НЕДОСТУПЕН';
+                } else if (httpCode >= 400 && httpCode <= 599) {
+                    statusClass = 'site-check-warning';
+                    statusText = '⚠ САЙТ ДОСТУПЕН — HTTP ' + httpCode;
+                } else {
+                    statusClass = 'site-check-success';
+                    statusText = '✓ САЙТ ДОСТУПЕН';
+                }
+
+                result.appendChild(E('div', {
+                    'class': statusClass
+                }, statusText));
+            }
+
             var table = E('table', {
                 'class': 'site-check-table'
             });
-
-            function valueCell(value) {
-                return E('td', {}, value || '');
-            }
 
             function stageCell(value) {
                 if (value === 'ok')
@@ -531,82 +554,100 @@ table.appendChild(E('tr', {}, [
 
             table.appendChild(E('tr', {}, [
                 E('td', {}, 'Маршрут через'),
-                routeText
-                    ? E('td', {}, E('span', {
+                E('td', {}, routeText
+                    ? E('span', {
                         'class': 'site-check-ok'
-                    }, routeText))
-                    : E('td', {}, '')
+                    }, routeText)
+                    : '')
             ]));
-
-            var contentCell = E('td', {}, '');
-            if (data.final === true && data.http === 'ok') {
-                contentCell = E('td', {}, E('span', {
-                    'class': data.content_ok === true
-                        ? 'site-check-ok'
-                        : 'site-check-fail'
-                }, data.content_ok === true
-                    ? '✓ Получено'
-                    : '✗ Не получено'));
-            }
 
             table.appendChild(E('tr', {}, [
                 E('td', {}, 'Содержимое'),
-                contentCell
+                E('td', {}, data.content_ok === true
+                    ? E('span', {
+                        'class': 'site-check-ok'
+                    }, '✓ Получено')
+                    : (data.final === true && data.http === 'ok'
+                        ? E('span', {
+                            'class': 'site-check-fail'
+                        }, '✗ Не получено')
+                        : ''))
             ]));
 
             table.appendChild(E('tr', {}, [
                 E('td', {}, 'IP-адрес'),
-                valueCell(data.final === true ? data.ip : '')
+                E('td', {}, data.ip || '')
             ]));
 
             table.appendChild(E('tr', {}, [
                 E('td', {}, 'Время ответа'),
-                valueCell(data.final === true && data.time
+                E('td', {}, data.time
                     ? data.time + ' сек.'
                     : '')
             ]));
 
             table.appendChild(E('tr', {}, [
                 E('td', {}, 'Получено'),
-                valueCell(data.final === true && data.size
+                E('td', {}, data.size
                     ? data.size + ' байт'
                     : '')
             ]));
 
             table.appendChild(E('tr', {}, [
                 E('td', {}, 'Тип содержимого'),
-                valueCell(data.final === true ? data.content_type : '')
+                E('td', {}, data.content_type || '')
             ]));
 
             table.appendChild(E('tr', {}, [
                 E('td', {}, 'Итоговый URL'),
-                valueCell(data.final === true ? data.url : '')
+                E('td', {}, data.url || '')
             ]));
 
             result.appendChild(table);
 
-            if (data.final === true) {
-                var available = data.available === true;
-                var httpCode = parseInt(data.http_code, 10) || 0;
-                var statusClass;
-                var statusText;
+            if (data.error) {
+                result.appendChild(E('div', {
+                    'style': 'margin-top:15px;font-weight:700;'
+                }, 'Ошибка:'));
 
-                if (!available) {
-                    statusClass = 'site-check-error';
-                    statusText = '✗ САЙТ НЕДОСТУПЕН';
-                } else if (httpCode >= 400 && httpCode <= 599) {
-                    statusClass = 'site-check-warning';
-                    statusText = '⚠ САЙТ ДОСТУПЕН — HTTP ' + httpCode;
-                } else {
-                    statusClass = 'site-check-success';
-                    statusText = '✓ САЙТ ДОСТУПЕН';
-                }
-
-                result.insertBefore(E('div', {
-                    'class': statusClass
-                }, statusText), result.firstChild);
+                result.appendChild(E('div', {
+                    'class': 'site-check-error-box'
+                }, data.error));
             }
         }
+
+        function renderEmptyResult() {
+            result.style.display = '';
+
+            result.innerHTML = '';
+
+            var table = E('table', {
+                'class': 'site-check-table'
+            });
+
+            [
+                'DNS',
+                'TCP',
+                'TLS',
+                'HTTP',
+                'Маршрут через',
+                'Содержимое',
+                'IP-адрес',
+                'Время ответа',
+                'Получено',
+                'Тип содержимого',
+                'Итоговый URL'
+            ].forEach(function(label) {
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, label),
+                    E('td', {}, '')
+                ]));
+            });
+
+            result.appendChild(table);
+        }
+
+        renderEmptyResult();
 
         function pollStageCheck(id) {
             callStatus(id).then(function(data) {
