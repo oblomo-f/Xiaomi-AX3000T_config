@@ -232,8 +232,9 @@ case "$1" in
     call)
         case "$2" in
             check)
-                URL="$(printf '%s' "$3" | jsonfilter -e '@.url' 2>/dev/null)"
-                DETECT_ROUTE="$(printf '%s' "$3" | jsonfilter -e '@.route' 2>/dev/null)"
+                INPUT="$(cat)"
+                URL="$(printf '%s' "$INPUT" | jsonfilter -e '@.url' 2>/dev/null)"
+                DETECT_ROUTE="$(printf '%s' "$INPUT" | jsonfilter -e '@.route' 2>/dev/null)"
                 check_url "$URL" "$DETECT_ROUTE"
                 ;;
             *)
