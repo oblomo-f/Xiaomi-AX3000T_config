@@ -36,6 +36,7 @@ detect_route()
 
     TRACE_TABLE="site_check_trace_$$"
     TRACE_FILE="/tmp/site-check-trace.$$"
+    REMOTE_IP_FILE="/tmp/site-check-route-ip.$$"
 
     if ! nft add table inet "$TRACE_TABLE" 2>/dev/null; then
         echo "unknown"
@@ -54,24 +55,28 @@ detect_route()
         return 0
     fi
 
-    rm -f "$TRACE_FILE"
+    rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
 
     nft monitor trace > "$TRACE_FILE" 2>/dev/null &
     MONITOR_PID=$!
 
     sleep 1
 
-    /usr/bin/curl \
-        -4 \
-        -L \
-        -sS \
-        -o /dev/null \
-        --connect-timeout 10 \
-        --max-time 20 \
-        --local-port "$PORT" \
-        "$URL" >/dev/null 2>&1
-
+    REMOTE_IP="$(
+        /usr/bin/curl \
+            -4 \
+            -L \
+            -sS \
+            -o /dev/null \
+            -w '%{remote_ip}' \
+            --connect-timeout 10 \
+            --max-time 20 \
+            --local-port "$PORT" \
+            "$URL" 2>/dev/null
+    )"
     CURL_RET=$?
+
+    printf '%s\n' "$REMOTE_IP" > "$REMOTE_IP_FILE"
 
     sleep 1
 
@@ -81,13 +86,29 @@ detect_route()
     nft delete table inet "$TRACE_TABLE" 2>/dev/null
 
     if [ "$CURL_RET" -eq 45 ]; then
-        rm -f "$TRACE_FILE"
+        case "$REMOTE_IP" in
+            198.18.*|198.19.*)
+                rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
+                echo "podkop"
+                return 0
+                ;;
+        esac
+
+        rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
         echo "unknown"
         return 0
     fi
 
     if [ ! -s "$TRACE_FILE" ]; then
-        rm -f "$TRACE_FILE"
+        case "$REMOTE_IP" in
+            198.18.*|198.19.*)
+                rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
+                echo "podkop"
+                return 0
+                ;;
+        esac
+
+        rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
         echo "direct"
         return 0
     fi
@@ -123,7 +144,15 @@ detect_route()
     }
     ' "$TRACE_FILE")"
 
-    rm -f "$TRACE_FILE"
+    # Дополнительный признак Podkop:
+    # 198.18.0.0/15 используется Podkop для TProxy.
+    case "$REMOTE_IP" in
+        198.18.*|198.19.*)
+            ROUTE="podkop"
+            ;;
+    esac
+
+    rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
 
     echo "${ROUTE:-unknown}"
     return 0
