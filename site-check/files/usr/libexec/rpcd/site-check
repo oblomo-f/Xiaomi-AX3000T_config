@@ -357,6 +357,43 @@ status_check()
     cat "$JOB"
 }
 
+package_version()
+{
+    PKG="$1"
+    opkg list-installed 2>/dev/null | awk -v p="$PKG" '$1 == p { print $3; found=1; exit } END { if (!found) print "" }'
+}
+
+system_info()
+{
+    BOARD="$(ubus call system board 2>/dev/null)"
+
+    MODEL="$(printf '%s' "$BOARD" | jsonfilter -e '@.model' 2>/dev/null)"
+    DISTRIBUTION="$(printf '%s' "$BOARD" | jsonfilter -e '@.release.distribution' 2>/dev/null)"
+    VERSION="$(printf '%s' "$BOARD" | jsonfilter -e '@.release.version' 2>/dev/null)"
+    REVISION="$(printf '%s' "$BOARD" | jsonfilter -e '@.release.revision' 2>/dev/null)"
+    DESCRIPTION="$(printf '%s' "$BOARD" | jsonfilter -e '@.release.description' 2>/dev/null)"
+
+    OS="$DESCRIPTION"
+    if [ -z "$OS" ]; then
+        OS="$DISTRIBUTION"
+        [ -n "$VERSION" ] && OS="$OS $VERSION"
+        [ -n "$REVISION" ] && OS="$OS $REVISION"
+    fi
+
+    PODKOP="$(package_version podkop)"
+    ZAPRET="$(package_version zapret)"
+    ZAPRET2="$(package_version zapret2)"
+    ZEROBLOCK="$(package_version zeroblock)"
+
+    printf '{"ok":true,"packages":{"podkop":"%s","zapret":"%s","zapret2":"%s","zeroblock":"%s"},"model":"%s","os":"%s"}\n' \
+        "$(json_escape "$PODKOP")" \
+        "$(json_escape "$ZAPRET")" \
+        "$(json_escape "$ZAPRET2")" \
+        "$(json_escape "$ZEROBLOCK")" \
+        "$(json_escape "$MODEL")" \
+        "$(json_escape "$OS")"
+}
+
 check_url()
 {
     URL="$1"
@@ -452,7 +489,7 @@ check_url()
 
 case "$1" in
     list)
-        echo '{"start":{"url":"String","route":"Boolean"},"status":{"id":"String"},"check":{"url":"String","route":"Boolean"}}'
+        echo '{"start":{"url":"String","route":"Boolean"},"status":{"id":"String"},"check":{"url":"String","route":"Boolean"},"system_info":{}}'
         ;;
     call)
         case "$2" in
@@ -466,6 +503,9 @@ case "$1" in
                 INPUT="$(cat)"
                 ID="$(printf '%s' "$INPUT" | jsonfilter -e '@.id' 2>/dev/null)"
                 status_check "$ID"
+                ;;
+            system_info)
+                system_info
                 ;;
             check)
                 INPUT="$(cat)"

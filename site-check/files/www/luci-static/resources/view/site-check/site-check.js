@@ -24,6 +24,13 @@ var callStatus = rpc.declare({
     expect: {}
 });
 
+var callSystemInfo = rpc.declare({
+    object: 'site-check',
+    method: 'system_info',
+    params: [],
+    expect: {}
+});
+
 return view.extend({
 
     render: function() {
@@ -48,6 +55,44 @@ return view.extend({
             'border:1px solid #ccc;',
             'border-radius:4px;',
             'max-width:900px;',
+            '}',
+
+            '.site-check-page .site-check-top{',
+            'display:flex;',
+            'gap:10px;',
+            'align-items:stretch;',
+            'max-width:900px;',
+            'margin-top:20px;',
+            '}',
+            '.site-check-page .site-check-top .site-check-result{',
+            'margin-top:0;',
+            'flex:1;',
+            'max-width:none;',
+            '}',
+            '.site-check-page .site-check-system-info{',
+            'flex:0 0 390px;',
+            'padding:16px;',
+            'border:1px solid #ccc;',
+            'border-radius:4px;',
+            'box-sizing:border-box;',
+            '}',
+            '.site-check-page .site-check-system-title{',
+            'font-size:16px;',
+            'font-weight:700;',
+            'margin-bottom:10px;',
+            '}',
+            '.site-check-page .site-check-system-table{',
+            'border-collapse:collapse;',
+            'width:100%;',
+            '}',
+            '.site-check-page .site-check-system-table td{',
+            'padding:6px 4px;',
+            'border-bottom:1px solid #ddd;',
+            'vertical-align:top;',
+            '}',
+            '.site-check-page .site-check-system-table td:first-child{',
+            'font-weight:700;',
+            'width:110px;',
             '}',
 
             '.site-check-page .site-check-title{',
@@ -161,6 +206,15 @@ return view.extend({
             'color:#777;',
             '}',
 
+            '@media(max-width:800px){',
+            '.site-check-page .site-check-top{',
+            'flex-direction:column;',
+            '}',
+            '.site-check-page .site-check-system-info{',
+            'flex-basis:auto;',
+            'width:100%;',
+            '}',
+            '}',
             '@media(max-width:600px){',
             '.site-check-page .site-check-url-row{',
             'flex-direction:column;',
@@ -377,6 +431,47 @@ table.appendChild(E('tr', {}, [
             }
         }
 
+        var systemInfo = E('div', {
+            'class': 'site-check-system-info'
+        });
+
+        function renderSystemInfo(data) {
+            systemInfo.innerHTML = '';
+
+            systemInfo.appendChild(E('div', {
+                'class': 'site-check-system-title'
+            }, 'Системная информация'));
+
+            var table = E('table', {
+                'class': 'site-check-system-table'
+            });
+
+            var packages = data && data.packages || {};
+
+            function addRow(label, value) {
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, label),
+                    E('td', {}, value || 'Не установлен')
+                ]));
+            }
+
+            addRow('Podkop', packages.podkop);
+            addRow('Zapret', packages.zapret);
+            addRow('Zapret2', packages.zapret2);
+            addRow('ZeroBlock', packages.zeroblock);
+            addRow('Устройство', data && data.model);
+            addRow('ОС', data && data.os);
+
+            systemInfo.appendChild(table);
+        }
+
+        renderSystemInfo({ packages: {} });
+        callSystemInfo().then(function(data) {
+            renderSystemInfo(data || {});
+        }).catch(function() {
+            renderSystemInfo({ packages: {} });
+        });
+
         var checkButton = E('button', {
             'type': 'button',
             'class': 'cbi-button cbi-button-action site-check-button'
@@ -384,143 +479,109 @@ table.appendChild(E('tr', {}, [
 
         function renderStageResult(data) {
             result.style.display = '';
-            result.innerHTML = '';
 
             if (!data)
-                return;
+                data = {};
 
-            if (data.error && data.state === 'error') {
-                result.appendChild(E('div', {
-                    'class': 'site-check-error'
-                }, '✗ ОШИБКА ПРОВЕРКИ'));
-
-                result.appendChild(E('div', {
-                    'class': 'site-check-error-box'
-                }, data.error));
-
-                var errorTable = E('table', {
-                    'class': 'site-check-table'
-                });
-
-                [ 'dns', 'tcp', 'tls', 'http' ].forEach(function(stage) {
-                    if (data[stage] === 'ok' || data[stage] === 'error') {
-                        errorTable.appendChild(E('tr', {}, [
-                            E('td', {}, stage.toUpperCase()),
-                            E('td', {}, stageText(data[stage]))
-                        ]));
-                    }
-                });
-
-                result.appendChild(errorTable);
-                return;
-            }
+            result.innerHTML = '';
 
             var table = E('table', {
                 'class': 'site-check-table'
             });
 
-            if (data.dns === 'ok') {
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'DNS'),
-                    E('td', {}, E('span', {
+            function valueCell(value) {
+                return E('td', {}, value || '');
+            }
+
+            function stageCell(value) {
+                if (value === 'ok')
+                    return E('td', {}, E('span', {
                         'class': 'site-check-ok'
-                    }, '✓ OK'))
-                ]));
+                    }, '✓ OK'));
+
+                if (value === 'error')
+                    return E('td', {}, E('span', {
+                        'class': 'site-check-fail'
+                    }, '✗ ОШИБКА'));
+
+                return E('td', {}, '');
             }
 
-            if (data.tcp === 'ok' || data.tcp === 'error') {
+            [ 'DNS', 'TCP', 'TLS', 'HTTP' ].forEach(function(stage) {
+                var key = stage.toLowerCase();
                 table.appendChild(E('tr', {}, [
-                    E('td', {}, 'TCP'),
-                    E('td', {}, stageText(data.tcp))
+                    E('td', {}, stage),
+                    stageCell(data[key])
                 ]));
-            }
+            });
 
-            if (data.tls === 'ok' || data.tls === 'error') {
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'TLS'),
-                    E('td', {}, stageText(data.tls))
-                ]));
-            }
-
-            if (data.http === 'ok' || data.http === 'error') {
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'HTTP'),
-                    E('td', {}, data.http === 'ok'
-                        ? E('span', {
-                            'class': 'site-check-ok'
-                        }, '✓ OK')
-                        : stageText(data.http))
-                ]));
-            }
-
-            if (data.http === 'ok' && data.route && data.route !== 'not_checked') {
-                var routeText = data.route;
-
-                if (routeText === 'zapret')
+            var routeText = '';
+            if (data.route && data.route !== 'not_checked') {
+                if (data.route === 'zapret')
                     routeText = 'Zapret';
-                else if (routeText === 'podkop')
+                else if (data.route === 'podkop')
                     routeText = 'Podkop';
-                else if (routeText === 'podkop+zapret')
+                else if (data.route === 'podkop+zapret')
                     routeText = 'Podkop + Zapret';
-                else if (routeText === 'direct')
+                else if (data.route === 'direct')
                     routeText = 'Напрямую';
                 else
                     routeText = 'Не определён';
+            }
 
-                var routeClass = data.route === 'direct' || data.route === 'unknown'
-                    ? 'site-check-na'
-                    : 'site-check-ok';
-
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'Маршрут через'),
-                    E('td', {}, E('span', {
-                        'class': routeClass
+            table.appendChild(E('tr', {}, [
+                E('td', {}, 'Маршрут через'),
+                routeText
+                    ? E('td', {}, E('span', {
+                        'class': 'site-check-ok'
                     }, routeText))
-                ]));
+                    : E('td', {}, '')
+            ]));
+
+            var contentCell = E('td', {}, '');
+            if (data.final === true && data.http === 'ok') {
+                contentCell = E('td', {}, E('span', {
+                    'class': data.content_ok === true
+                        ? 'site-check-ok'
+                        : 'site-check-fail'
+                }, data.content_ok === true
+                    ? '✓ Получено'
+                    : '✗ Не получено'));
             }
 
-            if (data.http === 'ok' && data.final === true) {
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'Содержимое'),
-                    E('td', {}, data.content_ok === true
-                        ? E('span', {
-                            'class': 'site-check-ok'
-                        }, '✓ Получено')
-                        : E('span', {
-                            'class': 'site-check-fail'
-                        }, '✗ Не получено')
-                    )
-                ]));
+            table.appendChild(E('tr', {}, [
+                E('td', {}, 'Содержимое'),
+                contentCell
+            ]));
 
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'IP-адрес'),
-                    E('td', {}, data.ip || '—')
-                ]));
+            table.appendChild(E('tr', {}, [
+                E('td', {}, 'IP-адрес'),
+                valueCell(data.final === true ? data.ip : '')
+            ]));
 
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'Время ответа'),
-                    E('td', {}, data.time
-                        ? data.time + ' сек.'
-                        : '—')
-                ]));
+            table.appendChild(E('tr', {}, [
+                E('td', {}, 'Время ответа'),
+                valueCell(data.final === true && data.time
+                    ? data.time + ' сек.'
+                    : '')
+            ]));
 
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'Получено'),
-                    E('td', {}, data.size
-                        ? data.size + ' байт'
-                        : '—')
-                ]));
+            table.appendChild(E('tr', {}, [
+                E('td', {}, 'Получено'),
+                valueCell(data.final === true && data.size
+                    ? data.size + ' байт'
+                    : '')
+            ]));
 
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'Тип содержимого'),
-                    E('td', {}, data.content_type || '—')
-                ]));
+            table.appendChild(E('tr', {}, [
+                E('td', {}, 'Тип содержимого'),
+                valueCell(data.final === true ? data.content_type : '')
+            ]));
 
-                table.appendChild(E('tr', {}, [
-                    E('td', {}, 'Итоговый URL'),
-                    E('td', {}, data.url || '—')
-                ]));
-            }
+            table.appendChild(E('tr', {}, [
+                E('td', {}, 'Итоговый URL'),
+                valueCell(data.final === true ? data.url : '')
+            ]));
 
             result.appendChild(table);
 
@@ -922,7 +983,12 @@ E('div', {
 
             ]),
 
-            result,
+            E('div', {
+                'class': 'site-check-top'
+            }, [
+                result,
+                systemInfo
+            ]),
 
             /*
              * Проверка нескольких сайтов

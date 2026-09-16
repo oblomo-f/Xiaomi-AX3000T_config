@@ -6,7 +6,8 @@
                 "site-check": [
                     "check",
                     "start",
-                    "status"
+                    "status",
+                    "system_info"
                 ]
             }
         }
