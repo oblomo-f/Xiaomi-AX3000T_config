@@ -2,18 +2,137 @@
 
 json_escape()
 {
-    printf '%s' "$1" | awk '{
-        gsub(/\\/, "\\\\");
-        gsub(/"/, "\\\"");
-        gsub(/\r/, "");
-        gsub(/\n/, "\\n");
-        printf "%s", $0
-    }'
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\t/\\t/g; s/\r/\\r/g; s/\n/\\n/g'
+}
+
+port_in_use()
+{
+    PORT="$1"
+    HEXPORT="$(printf '%04X' "$PORT")"
+    grep -qi ":$HEXPORT " /proc/net/tcp /proc/net/tcp6 2>/dev/null
+}
+
+detect_route()
+{
+    URL="$1"
+
+    BASE_PORT=$((45000 + ($$ % 10000)))
+    PORT=""
+
+    i=0
+    while [ "$i" -lt 20 ]; do
+        TEST_PORT=$((BASE_PORT + i))
+        if ! port_in_use "$TEST_PORT"; then
+            PORT="$TEST_PORT"
+            break
+        fi
+        i=$((i + 1))
+    done
+
+    if [ -z "$PORT" ]; then
+        echo "unknown"
+        return 0
+    fi
+
+    TRACE_TABLE="site_check_trace_$$"
+    TRACE_FILE="/tmp/site-check-trace.$$"
+
+    if ! nft add table inet "$TRACE_TABLE" 2>/dev/null; then
+        echo "unknown"
+        return 0
+    fi
+
+    if ! nft "add chain inet $TRACE_TABLE output { type filter hook output priority -500; policy accept; }" 2>/dev/null; then
+        nft delete table inet "$TRACE_TABLE" 2>/dev/null
+        echo "unknown"
+        return 0
+    fi
+
+    if ! nft add rule inet "$TRACE_TABLE" output tcp sport "$PORT" meta nftrace set 1 2>/dev/null; then
+        nft delete table inet "$TRACE_TABLE" 2>/dev/null
+        echo "unknown"
+        return 0
+    fi
+
+    rm -f "$TRACE_FILE"
+
+    nft monitor trace > "$TRACE_FILE" 2>/dev/null &
+    MONITOR_PID=$!
+
+    sleep 1
+
+    /usr/bin/curl \
+        -4 \
+        -L \
+        -sS \
+        -o /dev/null \
+        --connect-timeout 10 \
+        --max-time 20 \
+        --local-port "$PORT" \
+        "$URL" >/dev/null 2>&1
+
+    CURL_RET=$?
+
+    sleep 1
+
+    kill "$MONITOR_PID" 2>/dev/null
+    wait "$MONITOR_PID" 2>/dev/null
+
+    nft delete table inet "$TRACE_TABLE" 2>/dev/null
+
+    if [ "$CURL_RET" -eq 45 ]; then
+        rm -f "$TRACE_FILE"
+        echo "unknown"
+        return 0
+    fi
+
+    if [ ! -s "$TRACE_FILE" ]; then
+        rm -f "$TRACE_FILE"
+        echo "direct"
+        return 0
+    fi
+
+    ROUTE="$(awk '
+    BEGIN {
+        podkop = 0
+        zapret = 0
+    }
+
+    {
+        if ($0 ~ /inet PodkopTable/ &&
+            ($0 ~ /meta mark set/ ||
+             $0 ~ /tproxy ip to 127\.0\.0\.1:1602/)) {
+            podkop = 1
+        }
+
+        if ($0 ~ /inet zapret/ &&
+            $0 ~ /queue/) {
+            zapret = 1
+        }
+    }
+
+    END {
+        if (podkop && zapret)
+            print "podkop+zapret"
+        else if (podkop)
+            print "podkop"
+        else if (zapret)
+            print "zapret"
+        else
+            print "direct"
+    }
+    ' "$TRACE_FILE")"
+
+    rm -f "$TRACE_FILE"
+
+    echo "${ROUTE:-unknown}"
+    return 0
 }
 
 check_url()
 {
     URL="$1"
+    DETECT_ROUTE="$2"
 
     if [ -z "$URL" ]; then
         echo '{"ok":false,"error":"URL не указан"}'
@@ -23,138 +142,106 @@ check_url()
     URL="$(printf '%s' "$URL" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
     case "$URL" in
-        http://*|https://*)
-            ;;
+        http://*|https://*) ;;
         *)
-            echo '{"ok":false,"error":"Разрешены только http:// и https://"}'
+            echo '{"ok":false,"error":"URL должен начинаться с http:// или https://"}'
             return
             ;;
     esac
 
-    TMP_BODY="/tmp/site-check-body.$$"
-    TMP_ERR="/tmp/site-check-error.$$"
+    BODY_FILE="/tmp/site-check-body.$$"
+    CURL_ERR_FILE="/tmp/site-check-curl.$$"
+    rm -f "$BODY_FILE" "$CURL_ERR_FILE"
 
-    RESULT=$(/usr/bin/curl \
-        -4 \
-        -L \
-        -sS \
-        -o "$TMP_BODY" \
-        -w '%{http_code}|%{time_total}|%{remote_ip}|%{url_effective}|%{size_download}|%{content_type}' \
-        --connect-timeout 10 \
-        --max-time 20 \
-        "$URL" 2>"$TMP_ERR")
+    CURL_OUTPUT="$(
+        /usr/bin/curl \
+            -4 \
+            -L \
+            -sS \
+            -o "$BODY_FILE" \
+            -w '%{http_code}|%{time_total}|%{remote_ip}|%{url_effective}|%{size_download}|%{content_type}' \
+            --connect-timeout 10 \
+            --max-time 20 \
+            "$URL" 2>"$CURL_ERR_FILE"
+    )"
+    CURL_RET=$?
 
-    RET=$?
-    ERROR="$(cat "$TMP_ERR" 2>/dev/null)"
+    CURL_ERR="$(cat "$CURL_ERR_FILE" 2>/dev/null)"
+    rm -f "$CURL_ERR_FILE"
 
-    IFS='|' read -r CODE TIME IP EFFECTIVE SIZE CONTENT_TYPE <<EOF_RESULT
-$RESULT
-EOF_RESULT
+    HTTP_CODE="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f1)"
+    TIME_TOTAL="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f2)"
+    REMOTE_IP="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f3)"
+    URL_EFFECTIVE="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f4)"
+    SIZE_DOWNLOAD="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f5)"
+    CONTENT_TYPE="$(printf '%s' "$CURL_OUTPUT" | cut -d'|' -f6-)"
 
-
-if [ "$RET" -eq 0 ]; then
-
-    # Соединение с сервером состоялось.
-    # HTTP-код отдельно показывает результат обработки запроса.
+    DNS="ok"
+    TCP="ok"
+    TLS="ok"
+    HTTP="ok"
     AVAILABLE=true
 
-
-
-        if [ -s "$TMP_BODY" ]; then
-            CONTENT_OK=true
-        else
-            CONTENT_OK=false
-        fi
-
-        printf '{"ok":true,"available":%s,"dns":"ok","tcp":"ok","tls":"ok","http":"ok","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":0}\n' \
-            "$AVAILABLE" \
-            "${CODE:-0}" \
-            "${TIME:-0}" \
-            "$(json_escape "$IP")" \
-            "$(json_escape "$EFFECTIVE")" \
-            "${SIZE:-0}" \
-            "$(json_escape "$CONTENT_TYPE")" \
-            "$CONTENT_OK"
-
-        rm -f "$TMP_BODY" "$TMP_ERR"
-        return
-    fi
-
-    case "$RET" in
+    case "$CURL_RET" in
         6)
-            DNS_STATUS="error"
-            TCP_STATUS="not_tested"
-            TLS_STATUS="not_tested"
-            HTTP_STATUS="not_tested"
-            STAGE="DNS"
-            ;;
-
+            DNS="error"; TCP="error"; TLS="error"; HTTP="error"; AVAILABLE=false ;;
         7|28)
-            DNS_STATUS="ok"
-            TCP_STATUS="error"
-            TLS_STATUS="not_tested"
-            HTTP_STATUS="not_tested"
-            STAGE="TCP"
-            ;;
-
-        35|51|53|54|55|58|59|60|64|66|77)
-            DNS_STATUS="ok"
-            TCP_STATUS="ok"
-            TLS_STATUS="error"
-            HTTP_STATUS="not_tested"
-            STAGE="TLS"
-            ;;
-
+            TCP="error"; TLS="error"; HTTP="error"; AVAILABLE=false ;;
+        35|51|53|60|66|77)
+            TLS="error"; HTTP="error"; AVAILABLE=false ;;
+        0) ;;
         *)
-            DNS_STATUS="ok"
-            TCP_STATUS="ok"
-            TLS_STATUS="ok"
-            HTTP_STATUS="error"
-            STAGE="HTTP"
-            ;;
+            HTTP="error"; AVAILABLE=false ;;
     esac
 
-    ERROR="$(json_escape "$ERROR")"
+    if [ -n "$HTTP_CODE" ] && [ "$HTTP_CODE" != "000" ]; then
+        HTTP="ok"
+        AVAILABLE=true
+    fi
 
-    printf '{"ok":true,"available":false,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"","content_ok":false,"curl_code":%s,"stage":"%s","error":"%s"}\n' \
-        "$DNS_STATUS" \
-        "$TCP_STATUS" \
-        "$TLS_STATUS" \
-        "$HTTP_STATUS" \
-        "${CODE:-0}" \
-        "${TIME:-0}" \
-        "$(json_escape "$IP")" \
-        "$(json_escape "$EFFECTIVE")" \
-        "${SIZE:-0}" \
-        "$RET" \
-        "$STAGE" \
-        "$ERROR"
+    if [ -s "$BODY_FILE" ]; then
+        CONTENT_OK=true
+    else
+        CONTENT_OK=false
+    fi
 
-    rm -f "$TMP_BODY" "$TMP_ERR"
+    if [ "$DETECT_ROUTE" = "true" ] || [ "$DETECT_ROUTE" = "1" ]; then
+        ROUTE="$(detect_route "$URL")"
+    else
+        ROUTE="not_checked"
+    fi
+
+    rm -f "$BODY_FILE"
+
+    printf '{"ok":true,"available":%s,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":%s,"route":"%s"}\n' \
+        "$AVAILABLE" "$DNS" "$TCP" "$TLS" "$HTTP" \
+        "${HTTP_CODE:-0}" \
+        "$(json_escape "${TIME_TOTAL:-0}")" \
+        "$(json_escape "${REMOTE_IP:-}")" \
+        "$(json_escape "${URL_EFFECTIVE:-$URL}")" \
+        "${SIZE_DOWNLOAD:-0}" \
+        "$(json_escape "${CONTENT_TYPE:-}")" \
+        "$CONTENT_OK" "$CURL_RET" \
+        "$(json_escape "${ROUTE:-not_checked}")"
 }
 
 case "$1" in
-
     list)
-        echo '{"check":{"url":"String"}}'
+        echo '{"check":{"url":"String","route":"Boolean"}}'
         ;;
-
     call)
-
         case "$2" in
-
             check)
-                INPUT="$(cat)"
-                URL="$(jsonfilter -s "$INPUT" -e '@.url' 2>/dev/null)"
-                check_url "$URL"
+                URL="$(printf '%s' "$3" | jsonfilter -e '@.url' 2>/dev/null)"
+                DETECT_ROUTE="$(printf '%s' "$3" | jsonfilter -e '@.route' 2>/dev/null)"
+                check_url "$URL" "$DETECT_ROUTE"
                 ;;
-
             *)
-                echo '{"ok":false,"error":"unknown method"}'
+                echo '{"error":"Метод не найден"}'
                 ;;
-
         esac
-
         ;;
-
+    *)
+        echo '{"error":"Неизвестный вызов"}'
+        ;;
 esac

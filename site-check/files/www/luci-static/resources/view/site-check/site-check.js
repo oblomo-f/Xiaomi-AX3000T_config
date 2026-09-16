@@ -6,7 +6,7 @@
 var callCheck = rpc.declare({
     object: 'site-check',
     method: 'check',
-    params: [ 'url' ],
+    params: [ 'url', 'route' ],
     expect: {}
 });
 
@@ -19,6 +19,14 @@ return view.extend({
             '.site-check-page .site-check-url-row{display:flex;gap:10px;align-items:center;max-width:900px;}',
             '.site-check-page .site-check-url{flex:1;min-width:250px;}',
             '.site-check-page .site-check-button{white-space:nowrap;}',
+
+            '.site-check-page .site-check-route-option{',
+            'display:flex;',
+            'align-items:center;',
+            'gap:6px;',
+            'white-space:nowrap;',
+            'cursor:pointer;',
+            '}',
 
             '.site-check-page .site-check-result{',
             'margin-top:20px;',
@@ -161,6 +169,19 @@ return view.extend({
             'value': 'https://www.youtube.com'
         });
 
+        var routeCheckbox = E('input', {
+            'type': 'checkbox',
+            'id': 'site-check-route'
+        });
+
+        var routeLabel = E('label', {
+            'class': 'site-check-route-option',
+            'for': 'site-check-route'
+        }, [
+            routeCheckbox,
+            'Определить маршрут'
+        ]);
+
         var result = E('div', {
             'class': 'site-check-result',
             'style': 'display:none;'
@@ -271,6 +292,34 @@ table.appendChild(E('tr', {}, [
         }, '✗ Не получено')
     )
 ]));
+
+            if (data.route && data.route !== 'not_checked') {
+
+                var routeText = data.route;
+
+                if (routeText === 'zapret')
+                    routeText = 'Zapret';
+                else if (routeText === 'podkop')
+                    routeText = 'Podkop';
+                else if (routeText === 'podkop+zapret')
+                    routeText = 'Podkop + Zapret';
+                else if (routeText === 'direct')
+                    routeText = 'Напрямую';
+                else
+                    routeText = 'Не определён';
+
+                var routeClass = data.route === 'direct' || data.route === 'unknown'
+                    ? 'site-check-na'
+                    : 'site-check-ok';
+
+                table.appendChild(E('tr', {}, [
+                    E('td', {}, 'Маршрут через'),
+                    E('td', {}, E('span', {
+                        'class': routeClass
+                    }, routeText))
+                ]));
+            }
+
             table.appendChild(E('tr', {}, [
                 E('td', {}, 'IP-адрес'),
                 E('td', {}, data.ip || '—')
@@ -337,11 +386,12 @@ table.appendChild(E('tr', {}, [
             checkButton.textContent = 'ПРОВЕРКА...';
             result.style.display = 'none';
 
-            callCheck(url).then(function(data) {
+            callCheck(url, routeCheckbox.checked).then(function(data) {
 
                 showResult(data);
 
             }).catch(function(error) {
+
 
                 showResult({
                     ok: false,
@@ -349,7 +399,6 @@ table.appendChild(E('tr', {}, [
                 });
 
             }).finally(function() {
-
                 checkButton.disabled = false;
                 checkButton.textContent = 'ПРОВЕРИТЬ';
 
@@ -647,20 +696,24 @@ var multiInput = E('textarea', {
                 'class': 'cbi-section'
             }, [
 
-                E('div', {
-                    'class': 'site-check-title'
-                }, 'Проверка доступности сайта'),
+E('div', {
+    'class': 'site-check-title'
+}, 'Проверка доступности сайта'),
 
-                E('div', {
-                    'class': 'site-check-url-row'
-                }, [
-                    input,
-                    checkButton
-                ]),
+E('div', {
+    'class': 'site-check-url-row'
+}, [
+    input,
+    routeLabel,
+    checkButton
+]),
 
-                E('div', {
-                    'style': 'margin-top:8px;opacity:.75;'
-                }, 'Введите любой адрес сайта с http:// или https://.')
+E('div', {
+    'style': 'margin-top:8px;opacity:.75;'
+}, 'Введите любой адрес сайта с http:// или https://.')
+
+
+
             ]),
 
             result,
