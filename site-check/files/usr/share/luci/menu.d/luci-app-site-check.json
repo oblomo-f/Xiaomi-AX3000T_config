@@ -1,6 +1,6 @@
 {
     "admin/services/site-check": {
-        "title": "Site Checker",
+        "title": "Проверка сайтов",
         "order": 90,
         "action": {
             "type": "view",
