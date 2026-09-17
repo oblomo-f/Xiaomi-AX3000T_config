@@ -423,6 +423,8 @@ system_info()
         "$(json_escape "$OS")"
 }
 
+
+
 check_url()
 {
     URL="$1"
@@ -502,9 +504,110 @@ check_url()
         ROUTE="not_checked"
     fi
 
+    REDIRECT="false"
+    REDIRECT_URL=""
+    REDIRECT_ROUTE="not_checked"
+    REDIRECT_MORE="false"
+
+    REDIRECT_HEADERS="$(
+        /usr/bin/curl \
+            -4 \
+            -sS \
+            -D - \
+            -o /dev/null \
+            --connect-timeout 3 \
+            --max-time 3 \
+            "$URL" 2>/dev/null
+    )"
+
+    REDIRECT_RET=$?
+
+    if [ "$REDIRECT_RET" -eq 0 ]; then
+
+        REDIRECT_CODE="$(
+            printf '%s\n' "$REDIRECT_HEADERS" |
+            sed -n 's#^HTTP/[^ ]*[[:space:]]\+\([0-9][0-9][0-9]\).*#\1#p' |
+            tail -n 1
+        )"
+
+        case "$REDIRECT_CODE" in
+            301|302|303|307|308)
+
+                LOCATION="$(
+                    printf '%s\n' "$REDIRECT_HEADERS" |
+                    sed -n 's/^[Ll]ocation:[[:space:]]*//p' |
+                    tail -n 1 |
+                    tr -d '\r'
+                )"
+
+                if [ -n "$LOCATION" ]; then
+                    REDIRECT="true"
+
+                    case "$LOCATION" in
+                        http://*|https://*)
+                            REDIRECT_URL="$LOCATION"
+                            ;;
+                        /*)
+                            BASE="$(
+                                printf '%s\n' "$URL" |
+                                sed -E 's#^(https?://[^/]+).*#\1#'
+                            )"
+                            REDIRECT_URL="${BASE}${LOCATION}"
+                            ;;
+                        *)
+                            BASE="$(
+                                printf '%s\n' "$URL" |
+                                sed -E 's#^(https?://.*/)[^/]*$#\1#'
+                            )"
+                            REDIRECT_URL="${BASE}${LOCATION}"
+                            ;;
+                    esac
+
+                    if [ "$DETECT_ROUTE" = "true" ] || [ "$DETECT_ROUTE" = "1" ]; then
+                        REDIRECT_ROUTE="$(detect_route "$REDIRECT_URL")"
+                    fi
+
+                    SECOND_HEADERS="$(
+                        /usr/bin/curl \
+                            -4 \
+                            -sS \
+                            -D - \
+                            -o /dev/null \
+                            --connect-timeout 3 \
+                            --max-time 3 \
+                            "$REDIRECT_URL" 2>/dev/null
+                    )"
+
+                    SECOND_RET=$?
+
+                    if [ "$SECOND_RET" -eq 0 ]; then
+                        SECOND_CODE="$(
+                            printf '%s\n' "$SECOND_HEADERS" |
+                            sed -n 's#^HTTP/[^ ]*[[:space:]]\+\([0-9][0-9][0-9]\).*#\1#p' |
+                            tail -n 1
+                        )"
+
+                        case "$SECOND_CODE" in
+                            301|302|303|307|308)
+                                SECOND_LOCATION="$(
+                                    printf '%s\n' "$SECOND_HEADERS" |
+                                    sed -n 's/^[Ll]ocation:[[:space:]]*//p' |
+                                    tail -n 1 |
+                                    tr -d '\r'
+                                )"
+
+                                [ -n "$SECOND_LOCATION" ] && REDIRECT_MORE="true"
+                                ;;
+                        esac
+                    fi
+                fi
+                ;;
+        esac
+    fi
+
     rm -f "$BODY_FILE" "$CURL_ERR_FILE"
 
-    printf '{"ok":true,"available":%s,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":%s,"route":"%s"}\n' \
+    printf '{"ok":true,"available":%s,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":%s,"route":"%s","redirect":%s,"redirect_url":"%s","redirect_route":"%s","redirect_more":%s}\n' \
         "$AVAILABLE" "$DNS" "$TCP" "$TLS" "$HTTP" \
         "${HTTP_CODE:-0}" \
         "$(json_escape "${TIME_TOTAL:-0}")" \
@@ -513,9 +616,12 @@ check_url()
         "${SIZE_DOWNLOAD:-0}" \
         "$(json_escape "${CONTENT_TYPE:-}")" \
         "$CONTENT_OK" "$CURL_RET" \
-        "$(json_escape "${ROUTE:-not_checked}")"
+        "$(json_escape "${ROUTE:-not_checked}")" \
+        "$REDIRECT" \
+        "$(json_escape "${REDIRECT_URL:-}")" \
+        "$(json_escape "${REDIRECT_ROUTE:-not_checked}")" \
+        "$REDIRECT_MORE"
 }
-
 case "$1" in
     list)
         echo '{"start":{"url":"String","route":"Boolean"},"status":{"id":"String"},"check":{"url":"String","route":"Boolean"},"system_info":{}}'
