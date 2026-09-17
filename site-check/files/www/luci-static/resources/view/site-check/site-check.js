@@ -358,7 +358,7 @@ table.appendChild(E('tr', {}, [
     E('td', {}, data.content_ok === true
         ? E('span', {
             'class': 'site-check-ok'
-        }, '✓ Получено')
+        }, 'Получено')
         : E('span', {
             'class': 'site-check-fail'
         }, '✗ Не получено')
@@ -585,7 +585,7 @@ if (data.final === true) {
             contentCell.innerHTML = '';
             contentCell.appendChild(E('span', {
                 'class': 'site-check-ok'
-            }, '✓ Получено'));
+            }, 'Получено'));
         } else if (data.content_ok === false) {
             contentCell.innerHTML = '';
             contentCell.appendChild(E('span', {
