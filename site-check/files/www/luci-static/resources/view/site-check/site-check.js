@@ -489,6 +489,7 @@ table.appendChild(E('tr', {}, [
         var stageCells = {};
         var routeCell;
         var contentCell;
+        var podkopSectionCell;
         var dataCells = {};
         var resultTable;
         var routeDetected = false;
@@ -519,6 +520,7 @@ table.appendChild(E('tr', {}, [
             });
 
             routeCell.textContent = '';
+            podkopSectionCell.textContent = '';
             contentCell.textContent = '';
             dataCells.ip.textContent = '';
             routeDetected = false;
@@ -543,7 +545,9 @@ table.appendChild(E('tr', {}, [
              * It is shown once and never blocks the final data stage.
              */
             if (data.http === 'ok' && !routeDetected) {
-                var routeText = data.route;
+
+var routeText = data.route;
+                var podkopSectionText = data.podkop_section;
 
                 if (!routeCheckEnabled) {
                     routeText = 'Не определялся';
@@ -572,6 +576,27 @@ table.appendChild(E('tr', {}, [
                         'class': routeText === 'Не определялся' ? '' : 'site-check-ok'
                     }, routeText));
                 }
+
+if (data.route === 'podkop' || data.route === 'podkop+zapret') {
+    podkopSectionCell.textContent =
+        data.podkop_section &&
+        data.podkop_section !== 'not_checked'
+            ? data.podkop_section
+            : 'Не определена';
+
+    if (data.podkop_section &&
+        data.podkop_section !== 'not_checked') {
+        podkopSectionCell.style.color = '#1976D2';
+        podkopSectionCell.style.fontWeight = 'bold';
+    } else {
+        podkopSectionCell.style.color = '';
+        podkopSectionCell.style.fontWeight = '';
+    }
+} else {
+    podkopSectionCell.textContent = '—';
+    podkopSectionCell.style.color = '';
+    podkopSectionCell.style.fontWeight = '';
+}
             }
 
             /*
@@ -676,6 +701,7 @@ if (data.final === true) {
             stageCells.tls = addRow('tls', 'TLS');
             stageCells.http = addRow('http', 'HTTP');
             routeCell = addRow('route', 'Маршрут через');
+            podkopSectionCell = addRow('podkop_section', 'Секция Podkop');
             contentCell = addRow('content', 'Содержимое');
             dataCells.ip = addRow('ip', 'IP-адрес');
             dataCells.time = addRow('time', 'Время ответа');
