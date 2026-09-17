@@ -592,20 +592,19 @@ table.appendChild(E('tr', {}, [
              * This fixes the case where route was rendered on the HTTP poll
              * and later final=true could no longer render content/data.
              */
-            if (data.final === true) {
-                window.setTimeout(function() {
-                    if (data.content_ok === true) {
-                        contentCell.innerHTML = '';
-                        contentCell.appendChild(E('span', {
-                            'class': 'site-check-ok'
-                        }, '✓ Получено'));
-                    } else {
-                        contentCell.innerHTML = '';
-                        contentCell.appendChild(E('span', {
-                            'class': 'site-check-fail'
-                        }, '✗ Не получено'));
-                    }
-
+if (data.final === true) {
+    window.setTimeout(function() {
+        if (data.content_ok === true) {
+            contentCell.innerHTML = '';
+            contentCell.appendChild(E('span', {
+                'class': 'site-check-ok'
+            }, '✓ Получено'));
+        } else if (data.content_ok === false) {
+            contentCell.innerHTML = '';
+            contentCell.appendChild(E('span', {
+                'class': 'site-check-fail'
+            }, '✗ Не получено'));
+        }
                     window.setTimeout(function() {
                         if (data.ip)
                             dataCells.ip.textContent = data.ip;
