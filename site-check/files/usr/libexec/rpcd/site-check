@@ -77,6 +77,7 @@ detect_podkop_section()
         return 0
     }
 
+    # 1. Сначала ищем точное совпадение в user_domains_text.
     for SECTION in $(uci show podkop 2>/dev/null |
         sed -n 's/^podkop\.\([^.=]*\)=section$/\1/p'); do
 
@@ -84,16 +85,87 @@ detect_podkop_section()
 
         for D in $DOMAINS; do
             if [ "$D" = "$DOMAIN" ]; then
-                echo "$SECTION"
+                echo "$SECTION|"
                 return 0
             fi
         done
     done
 
+    # 2. Проверяем community_lists.
+    #    geoblock и block исключаем: это общие списки.
+    for SECTION in $(uci show podkop 2>/dev/null |
+        sed -n 's/^podkop\.\([^.=]*\)=section$/\1/p'); do
+
+        for COMMUNITY in $(uci -q get "podkop.$SECTION.community_lists" 2>/dev/null); do
+
+            case "$COMMUNITY" in
+                geoblock|block)
+                    continue
+                    ;;
+            esac
+
+            [ -n "$COMMUNITY" ] || continue
+
+            RULESET="/tmp/site-check-${COMMUNITY}.srs"
+            RULESET_JSON="/tmp/site-check-${COMMUNITY}.json"
+
+            # Скачиваем ruleset только если его ещё нет.
+            if [ ! -s "$RULESET" ]; then
+                if ! /usr/bin/curl \
+                    -4 \
+                    -fsSL \
+                    -L \
+                    --connect-timeout 5 \
+                    --max-time 10 \
+                    -o "$RULESET.tmp" \
+                    "https://github.com/itdoginfo/allow-domains/releases/latest/download/${COMMUNITY}.srs" \
+                    2>/dev/null; then
+
+                    rm -f "$RULESET.tmp"
+                    continue
+                fi
+
+                mv "$RULESET.tmp" "$RULESET"
+            fi
+
+            rm -f "$RULESET_JSON"
+
+            # Переводим binary ruleset в JSON.
+            if ! /usr/bin/sing-box rule-set decompile \
+                "$RULESET" \
+                -o "$RULESET_JSON" >/dev/null 2>&1; then
+                rm -f "$RULESET_JSON"
+                continue
+            fi
+
+            # Проверяем ТОЛЬКО domain_suffix.
+            # IP-сети здесь намеренно игнорируются,
+            # чтобы Cloudflare/IP-сети не давали ложных совпадений.
+MATCHED=0
+
+for SUFFIX in $(jsonfilter -i "$RULESET_JSON" \
+    -e '@.rules[*].domain_suffix[*]' 2>/dev/null); do
+
+    case "$DOMAIN" in
+        "$SUFFIX"|*."$SUFFIX")
+            MATCHED=1
+            break
+            ;;
+    esac
+done
+
+if [ "$MATCHED" -eq 1 ]; then
+                rm -f "$RULESET_JSON"
+                echo "$SECTION|$COMMUNITY"
+                return 0
+            fi
+
+            rm -f "$RULESET_JSON"
+        done
+    done
+
     echo "unknown"
 }
-
-
 
 write_job()
 {
@@ -235,20 +307,33 @@ fi
 
 ROUTE="not_checked"
 PODKOP_SECTION="not_checked"
+PODKOP_COMMUNITY="not_checked"
 
 if [ "$DETECT_ROUTE" = "true" ] || [ "$DETECT_ROUTE" = "1" ]; then
     ROUTE="$(detect_route "$URL")"
 
     if [ "$ROUTE" = "podkop" ] || [ "$ROUTE" = "podkop+zapret" ]; then
-        PODKOP_SECTION="$(detect_podkop_section "$URL")"
+        PODKOP_RESULT="$(detect_podkop_section "$URL")"
+
+        case "$PODKOP_RESULT" in
+            *'|'*)
+                PODKOP_SECTION="${PODKOP_RESULT%%|*}"
+                PODKOP_COMMUNITY="${PODKOP_RESULT#*|}"
+                ;;
+            *)
+                PODKOP_SECTION="$PODKOP_RESULT"
+                PODKOP_COMMUNITY=""
+                ;;
+        esac
     else
         PODKOP_SECTION="not_defined"
+        PODKOP_COMMUNITY=""
     fi
 fi
 
     # Final result: route is shown immediately after HTTP, followed by
     # content and the remaining response information.
-printf '{"state":"done","final":true,"ok":true,"available":%s,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":%s,"route":"%s","podkop_section":"%s"}\n' \
+printf '{"state":"done","final":true,"ok":true,"available":%s,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":%s,"content_type":"%s","content_ok":%s,"curl_code":%s,"route":"%s","podkop_section":"%s","podkop_community":"%s"}' \
     "$AVAILABLE" \
     "$DNS" \
     "$TCP" \
@@ -263,7 +348,8 @@ printf '{"state":"done","final":true,"ok":true,"available":%s,"dns":"%s","tcp":"
     "$CONTENT_OK" \
     "$CURL_RET" \
     "$(json_escape "$ROUTE")" \
-    "$(json_escape "$PODKOP_SECTION")" > "${JOB}.tmp"
+    "$(json_escape "$PODKOP_SECTION")" \
+    "$(json_escape "$PODKOP_COMMUNITY")" > "${JOB}.tmp"
 
     mv "${JOB}.tmp" "$JOB"
 
