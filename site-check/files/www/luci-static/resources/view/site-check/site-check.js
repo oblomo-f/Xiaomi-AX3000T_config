@@ -105,7 +105,7 @@ return view.extend({
             '.site-check-page .site-check-success{',
             'color:#2e7d32;',
             'font-weight:700;',
-            'font-size:18px;',
+            'font-size:14px;',
             '}',
 
             '.site-check-page .site-check-status{',
