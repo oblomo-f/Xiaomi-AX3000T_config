@@ -132,7 +132,7 @@ return view.extend({
 '.site-check-page .site-check-warning{',
 'color:#ef6c00;',
 'font-weight:700;',
-'font-size:18px;',
+'font-size:14px;',
 '},',
 
             '.site-check-page .site-check-table{',
