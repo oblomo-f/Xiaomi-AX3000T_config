@@ -16,16 +16,18 @@ detect_route()
 {
     URL="$1"
 
-    BASE_PORT=$((45000 + ($$ % 10000)))
     PORT=""
+    BASE_PORT=40000
 
     i=0
     while [ "$i" -lt 20 ]; do
         TEST_PORT=$((BASE_PORT + i))
+
         if ! port_in_use "$TEST_PORT"; then
             PORT="$TEST_PORT"
             break
         fi
+
         i=$((i + 1))
     done
 
@@ -33,34 +35,6 @@ detect_route()
         echo "unknown"
         return 0
     fi
-
-    TRACE_TABLE="site_check_trace_$$"
-    TRACE_FILE="/tmp/site-check-trace.$$"
-    REMOTE_IP_FILE="/tmp/site-check-route-ip.$$"
-
-    if ! nft add table inet "$TRACE_TABLE" 2>/dev/null; then
-        echo "unknown"
-        return 0
-    fi
-
-    if ! nft "add chain inet $TRACE_TABLE output { type filter hook output priority -500; policy accept; }" 2>/dev/null; then
-        nft delete table inet "$TRACE_TABLE" 2>/dev/null
-        echo "unknown"
-        return 0
-    fi
-
-    if ! nft add rule inet "$TRACE_TABLE" output tcp sport "$PORT" meta nftrace set 1 2>/dev/null; then
-        nft delete table inet "$TRACE_TABLE" 2>/dev/null
-        echo "unknown"
-        return 0
-    fi
-
-    rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
-
-    nft monitor trace > "$TRACE_FILE" 2>/dev/null &
-    MONITOR_PID=$!
-
-    sleep 1
 
     REMOTE_IP="$(
         /usr/bin/curl \
@@ -76,87 +50,50 @@ detect_route()
     )"
     CURL_RET=$?
 
-    printf '%s\n' "$REMOTE_IP" > "$REMOTE_IP_FILE"
+    case "$REMOTE_IP" in
+        198.18.*|198.19.*)
+            echo "podkop"
+            return 0
+            ;;
+    esac
 
-    sleep 1
-
-    kill "$MONITOR_PID" 2>/dev/null
-    wait "$MONITOR_PID" 2>/dev/null
-
-    nft delete table inet "$TRACE_TABLE" 2>/dev/null
-
-    if [ "$CURL_RET" -eq 45 ]; then
-        case "$REMOTE_IP" in
-            198.18.*|198.19.*)
-                rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
-                echo "podkop"
-                return 0
-                ;;
-        esac
-
-        rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
+    if [ "$CURL_RET" -ne 0 ]; then
         echo "unknown"
         return 0
     fi
 
-    if [ ! -s "$TRACE_FILE" ]; then
-        case "$REMOTE_IP" in
-            198.18.*|198.19.*)
-                rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
-                echo "podkop"
-                return 0
-                ;;
-        esac
-
-        rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
-        echo "direct"
-        return 0
-    fi
-
-    ROUTE="$(awk '
-    BEGIN {
-        podkop = 0
-        zapret = 0
-    }
-
-    {
-        if ($0 ~ /inet PodkopTable/ &&
-            ($0 ~ /meta mark set/ ||
-             $0 ~ /tproxy ip to 127\.0\.0\.1:1602/)) {
-            podkop = 1
-        }
-
-        if ($0 ~ /inet zapret/ &&
-            $0 ~ /queue/) {
-            zapret = 1
-        }
-    }
-
-    END {
-        if (podkop && zapret)
-            print "podkop+zapret"
-        else if (podkop)
-            print "podkop"
-        else if (zapret)
-            print "zapret"
-        else
-            print "direct"
-    }
-    ' "$TRACE_FILE")"
-
-    # Дополнительный признак Podkop:
-    # 198.18.0.0/15 используется Podkop для TProxy.
-    case "$REMOTE_IP" in
-        198.18.*|198.19.*)
-            ROUTE="podkop"
-            ;;
-    esac
-
-    rm -f "$TRACE_FILE" "$REMOTE_IP_FILE"
-
-    echo "${ROUTE:-unknown}"
+    echo "zapret"
     return 0
 }
+
+detect_podkop_section()
+{
+    URL="$1"
+
+    DOMAIN="$(printf '%s' "$URL" | sed -E 's#^[a-zA-Z]+://##; s#/.*##; s/:.*$//')"
+
+    [ -n "$DOMAIN" ] || {
+        echo "unknown"
+        return 0
+    }
+
+    for SECTION in $(uci show podkop 2>/dev/null |
+        sed -n 's/^podkop\.\([^.=]*\)=section$/\1/p'); do
+
+        DOMAINS="$(uci -q get "podkop.$SECTION.user_domains_text" 2>/dev/null)"
+
+        for D in $DOMAINS; do
+            if [ "$D" = "$DOMAIN" ]; then
+                echo "$SECTION"
+                return 0
+            fi
+        done
+    done
+
+    echo "unknown"
+}
+
+
 
 write_job()
 {
@@ -296,23 +233,37 @@ fi
         return 0
     fi
 
-    ROUTE="not_checked"
-    if [ "$DETECT_ROUTE" = "true" ] || [ "$DETECT_ROUTE" = "1" ]; then
-        ROUTE="$(detect_route "$URL")"
+ROUTE="not_checked"
+PODKOP_SECTION="not_checked"
+
+if [ "$DETECT_ROUTE" = "true" ] || [ "$DETECT_ROUTE" = "1" ]; then
+    ROUTE="$(detect_route "$URL")"
+
+    if [ "$ROUTE" = "podkop" ] || [ "$ROUTE" = "podkop+zapret" ]; then
+        PODKOP_SECTION="$(detect_podkop_section "$URL")"
+    else
+        PODKOP_SECTION="not_defined"
     fi
+fi
 
     # Final result: route is shown immediately after HTTP, followed by
     # content and the remaining response information.
-    printf '{"state":"done","final":true,"ok":true,"available":%s,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":%s,"route":"%s"}\n' \
-        "$AVAILABLE" "$DNS" "$TCP" "$TLS" "$HTTP" \
-        "${HTTP_CODE:-0}" \
-        "$(json_escape "${TIME_TOTAL:-0}")" \
-        "$(json_escape "${REMOTE_IP:-}")" \
-        "$(json_escape "${URL_EFFECTIVE:-$URL}")" \
-        "${SIZE_DOWNLOAD:-0}" \
-        "$(json_escape "${CONTENT_TYPE:-}")" \
-        "$CONTENT_OK" "$CURL_RET" \
-        "$(json_escape "${ROUTE:-not_checked}")" > "${JOB}.tmp"
+printf '{"state":"done","final":true,"ok":true,"available":%s,"dns":"%s","tcp":"%s","tls":"%s","http":"%s","http_code":%s,"time":"%s","ip":"%s","url":"%s","size":"%s","content_type":"%s","content_ok":%s,"curl_code":%s,"route":"%s","podkop_section":"%s"}\n' \
+    "$AVAILABLE" \
+    "$DNS" \
+    "$TCP" \
+    "$TLS" \
+    "$HTTP" \
+    "$HTTP_CODE" \
+    "$(json_escape "$TIME_TOTAL")" \
+    "$(json_escape "$REMOTE_IP")" \
+    "$(json_escape "$URL_EFFECTIVE")" \
+    "$SIZE_DOWNLOAD" \
+    "$(json_escape "$CONTENT_TYPE")" \
+    "$CONTENT_OK" \
+    "$CURL_RET" \
+    "$(json_escape "$ROUTE")" \
+    "$(json_escape "$PODKOP_SECTION")" > "${JOB}.tmp"
 
     mv "${JOB}.tmp" "$JOB"
 
