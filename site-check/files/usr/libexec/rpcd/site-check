@@ -245,30 +245,46 @@ run_job()
     if [ "$DNS" = "ok" ]; then
         write_job "$ID" '{"state":"running","dns":"ok","tcp":"pending","tls":"pending","http":"pending","route":"not_checked","final":false}'
         sleep 0.8
-    else
-        write_job "$ID" '{"state":"running","dns":"error","tcp":"pending","tls":"pending","http":"pending","route":"not_checked","final":false}'
-        sleep 0.8
-    fi
+else
+    write_job "$ID" '{"state":"done","final":true,"ok":false,"available":false,"dns":"ok","tcp":"ok","tls":"ok","http":"error","route":"not_checked"}'
+    sleep 0.8
+    rm -f "$BODY" "$OUT" "$ERR"
+    (
+        sleep 10
+        rm -f "$JOB"
+    ) >/dev/null 2>&1 &
+    return 0
+fi
 
     if [ "$TCP" = "ok" ]; then
         write_job "$ID" '{"state":"running","dns":"ok","tcp":"ok","tls":"pending","http":"pending","route":"not_checked","final":false}'
         sleep 0.8
-    elif [ "$TCP" = "error" ]; then
-        write_job "$ID" '{"state":"running","dns":"ok","tcp":"error","tls":"pending","http":"pending","route":"not_checked","final":false}'
-        sleep 0.8
-        rm -f "$BODY" "$OUT" "$ERR"
-        return 0
-    fi
+ 
+elif [ "$TCP" = "error" ]; then
+    write_job "$ID" '{"state":"done","final":true,"ok":false,"available":false,"dns":"ok","tcp":"error","tls":"pending","http":"pending","route":"not_checked"}'
+    sleep 0.8
+    rm -f "$BODY" "$OUT" "$ERR"
+    (
+        sleep 10
+        rm -f "$JOB"
+    ) >/dev/null 2>&1 &
+    return 0
+fi
 
     if [ "$TLS" = "ok" ]; then
         write_job "$ID" '{"state":"running","dns":"ok","tcp":"ok","tls":"ok","http":"pending","route":"not_checked","final":false}'
         sleep 0.8
-    elif [ "$TLS" = "error" ]; then
-        write_job "$ID" '{"state":"running","dns":"ok","tcp":"ok","tls":"error","http":"pending","route":"not_checked","final":false}'
-        sleep 0.8
-        rm -f "$BODY" "$OUT" "$ERR"
-        return 0
-    fi
+
+elif [ "$TLS" = "error" ]; then
+    write_job "$ID" '{"state":"done","final":true,"ok":false,"available":false,"dns":"ok","tcp":"ok","tls":"error","http":"pending","route":"not_checked"}'
+    sleep 0.8
+    rm -f "$BODY" "$OUT" "$ERR"
+    (
+        sleep 10
+        rm -f "$JOB"
+    ) >/dev/null 2>&1 &
+    return 0
+fi
 
     if [ "$HTTP" = "ok" ]; then
         write_job "$ID" '{"state":"running","dns":"ok","tcp":"ok","tls":"ok","http":"ok","route":"not_checked","final":false}'
