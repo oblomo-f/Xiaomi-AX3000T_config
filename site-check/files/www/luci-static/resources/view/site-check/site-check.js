@@ -45,7 +45,7 @@ return view.extend({
             'margin-top:20px;',
             'padding:16px;',
             'border:1px solid #ccc;',
-            'border-radius:4px;',
+            'border-radius:14px;',
             'max-width:900px;',
             '}',
 
@@ -125,17 +125,22 @@ return view.extend({
 'font-weight:700;',
 'font-size:14px;',
 '},',
-            '.site-check-page .site-check-table{',
-            'border-collapse:collapse;',
-            'width:100%;',
-            'margin-top:15px;',
-            '}',
 
-            '.site-check-page .site-check-table td{',
+'.site-check-page .site-check-table{',
+'border-collapse:collapse;',
+'width:100%;',
+'table-layout:fixed;',
+'margin-top:15px;',
+'}',
+           '.site-check-page .site-check-table td{',
             'padding:7px 10px;',
             'border-bottom:1px solid #ddd;',
             '}',
 
+'.site-check-page .site-check-table td:nth-child(2){',
+'overflow-wrap:anywhere;',
+'word-break:break-word;',
+'}',
             '.site-check-page .site-check-table td:first-child{',
             'font-weight:700;',
             'width:180px;',
@@ -662,7 +667,19 @@ if (data.final === true) {
                         if (data.content_type)
                             dataCells.content_type.textContent = data.content_type;
                         if (data.url)
-                            dataCells.url.textContent = data.url;
+
+var displayUrl = data.url || '';
+
+if (displayUrl.length > 100) {
+    displayUrl =
+        displayUrl.substring(0, 50) +
+        '.........................' +
+        displayUrl.slice(-15);
+}
+
+dataCells.url.textContent = displayUrl;
+
+
 
                         /*
                          * The status is the first, separate table cell,
