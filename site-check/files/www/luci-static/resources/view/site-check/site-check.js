@@ -451,7 +451,8 @@ table.appendChild(E('tr', {}, [
 
             var packages = data && data.packages || {};
 
-            function addRow(label, value) {
+ 
+function addRow(label, value) {
                 table.appendChild(E('tr', {}, [
                     E('td', {}, label),
                     E('td', {}, value || 'Не установлен')
@@ -490,6 +491,7 @@ table.appendChild(E('tr', {}, [
         var routeCell;
         var contentCell;
         var podkopSectionCell;
+        var podkopCommunityCell;
         var dataCells = {};
         var resultTable;
         var routeDetected = false;
@@ -519,9 +521,18 @@ table.appendChild(E('tr', {}, [
                 setStageCell(stageCells[key], '');
             });
 
-            routeCell.textContent = '';
-            podkopSectionCell.textContent = '';
-            contentCell.textContent = '';
+routeCell.textContent = '';
+podkopSectionCell.textContent = '';
+
+if (podkopCommunityCell) {
+    podkopCommunityCell.textContent = '';
+    podkopCommunityCell.style.color = '';
+    podkopCommunityCell.style.fontWeight = '';
+    podkopCommunityCell.parentNode.style.display = 'none';
+}
+
+contentCell.textContent = '';
+
             dataCells.ip.textContent = '';
             routeDetected = false;
             finalDetailsQueued = false;
@@ -578,27 +589,51 @@ var routeText = data.route;
                 }
 
 if (data.route === 'podkop' || data.route === 'podkop+zapret') {
-    podkopSectionCell.textContent =
-        data.podkop_section &&
-        data.podkop_section !== 'not_checked'
-            ? data.podkop_section
-            : 'Не определена';
+    var podkopSection = data.podkop_section || '';
 
-    if (data.podkop_section &&
-        data.podkop_section !== 'not_checked') {
+    podkopSectionCell.textContent = podkopSection || 'Не определена';
+
+    if (podkopSection && podkopSection !== 'not_checked') {
         podkopSectionCell.style.color = '#1976D2';
         podkopSectionCell.style.fontWeight = 'bold';
     } else {
         podkopSectionCell.style.color = '';
         podkopSectionCell.style.fontWeight = '';
     }
+
+if (podkopCommunityCell) {
+    podkopCommunityCell.textContent = '';
+
+    if (data.podkop_community &&
+        data.podkop_community !== 'not_checked' &&
+        data.podkop_community !== 'unknown') {
+
+        podkopCommunityCell.textContent =
+            data.podkop_community.charAt(0).toUpperCase() +
+            data.podkop_community.slice(1);
+            podkopCommunityCell.style.color = '#1976D2';
+            podkopCommunityCell.style.fontWeight = 'bold';
+
+        podkopCommunityCell.parentNode.style.display = '';
+    } else {
+        podkopCommunityCell.style.fontWeight = '';
+        podkopCommunityCell.parentNode.style.display = 'none';
+    }
+}
+
+    }
 } else {
     podkopSectionCell.textContent = '—';
     podkopSectionCell.style.color = '';
     podkopSectionCell.style.fontWeight = '';
-}
-            }
 
+    if (podkopCommunityCell) {
+        podkopCommunityCell.textContent = '';
+        podkopCommunityCell.style.color = '';
+        podkopCommunityCell.style.fontWeight = '';
+        podkopCommunityCell.parentNode.style.display = 'none';
+    }
+}
             /*
              * Final response data is independent from route rendering.
              * This fixes the case where route was rendered on the HTTP poll
@@ -702,6 +737,10 @@ if (data.final === true) {
             stageCells.http = addRow('http', 'HTTP');
             routeCell = addRow('route', 'Маршрут через');
             podkopSectionCell = addRow('podkop_section', 'Секция Podkop');
+
+podkopCommunityCell = addRow('podkop_community', 'Списки сообщества');
+podkopCommunityCell.parentNode.style.display = 'none';
+
             contentCell = addRow('content', 'Содержимое');
             dataCells.ip = addRow('ip', 'IP-адрес');
             dataCells.time = addRow('time', 'Время ответа');
