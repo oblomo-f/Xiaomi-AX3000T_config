@@ -9,38 +9,30 @@ var callCheck = rpc.declare({
     params: [ 'url', 'route' ],
     expect: {}
 });
-
 var callStart = rpc.declare({
     object: 'site-check',
     method: 'start',
     params: [ 'url', 'route' ],
     expect: {}
 });
-
 var callStatus = rpc.declare({
     object: 'site-check',
     method: 'status',
     params: [ 'id' ],
     expect: {}
 });
-
 var callSystemInfo = rpc.declare({
     object: 'site-check',
     method: 'system_info',
     params: [],
     expect: {}
 });
-
 return view.extend({
-
     render: function() {
-
         var style = E('style', {}, [
-
             '.site-check-page .site-check-url-row{display:flex;gap:10px;align-items:center;max-width:900px;}',
             '.site-check-page .site-check-url{flex:1;min-width:250px;}',
             '.site-check-page .site-check-button{white-space:nowrap;}',
-
             '.site-check-page .site-check-route-option{',
             'display:flex;',
             'align-items:center;',
@@ -128,13 +120,11 @@ return view.extend({
             'font-weight:700;',
             'font-size:14px;',
             '}',
-
 '.site-check-page .site-check-warning{',
 'color:#ef6c00;',
 'font-weight:700;',
 'font-size:14px;',
 '},',
-
             '.site-check-page .site-check-table{',
             'border-collapse:collapse;',
             'width:100%;',
@@ -245,7 +235,6 @@ return view.extend({
         /*
          * ОДИНОЧНАЯ ПРОВЕРКА
          */
-
         var input = E('input', {
             'type': 'text',
             'class': 'cbi-input site-check-url',
@@ -315,7 +304,6 @@ return view.extend({
                 return;
             }
 
-
 var available = data.available === true;
 var httpCode = parseInt(data.http_code, 10) || 0;
 
@@ -376,7 +364,6 @@ table.appendChild(E('tr', {}, [
         }, '✗ Не получено')
     )
 ]));
-
             if (data.route && data.route !== 'not_checked') {
 
                 var routeText = data.route;
@@ -654,7 +641,7 @@ if (data.final === true) {
                 contentCell.innerHTML = '';
                 contentCell.appendChild(E('span', {
                     'class': 'site-check-ok'
-                }, '✓ Получено'));
+                }, 'Получено'));
             }
         }
 
@@ -1077,9 +1064,6 @@ E('div', {
 E('div', {
     'style': 'margin-top:8px;opacity:.75;'
 }, 'Введите любой адрес сайта с http:// или https://.')
-
-
-
             ]),
 
             E('div', {
