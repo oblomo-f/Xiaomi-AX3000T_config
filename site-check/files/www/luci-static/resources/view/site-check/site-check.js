@@ -53,7 +53,7 @@ return view.extend({
             'display:flex;',
             'gap:10px;',
             'align-items:stretch;',
-            'max-width:1000px;',
+            'max-width:900px;',
             'margin-top:20px;',
             '}',
             '.site-check-page .site-check-top .site-check-result{',
